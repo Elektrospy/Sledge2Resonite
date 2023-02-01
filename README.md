@@ -1,7 +1,7 @@
-# AssetImportAPI
+# Sledge2NeosVR
 
 A [NeosModLoader](https://github.com/zkxs/NeosModLoader) mod for [Neos VR](https://neos.com/)  
-Enables developers to import their own assets.
+Enables users to import their own sledge file format based assets.
 
 ## Usage
 1. Install [NeosModLoader](https://github.com/zkxs/NeosModLoader).
