@@ -3,6 +3,8 @@
 A [NeosModLoader](https://github.com/zkxs/NeosModLoader) mod for [Neos VR](https://neos.com/)  
 Enables users to import their own sledge file format based assets.
 
+Only parcial support of *.vmt and *.vtf files for now
+
 ## Usage
 1. Install [NeosModLoader](https://github.com/zkxs/NeosModLoader).
 1. Clone this Repository
