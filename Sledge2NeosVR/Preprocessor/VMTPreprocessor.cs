@@ -8,19 +8,21 @@ public class VMTPreprocessor : IPreprocessor
     public bool Preprocess(string[] input, out string[] parsedFile)
     {
         base.Preprocess(input, out parsedFile);
-
+        // Remove enclosing quotation marks from first line
         parsedFile[0] = input[0].Replace("\"", "");
-
+        // loop trough indiviual lines
         for (int i = 1; i < input.Length; i++)
         {
             // Determine if its suffix (rest of the string) starts and ends with quotation marks
+            /*
             if (!validPrefix.Match(input[i]).Success)
             {
                 continue;
             }
+            */
 
             // Remove any trailing comments
-            string restOfString = Regex.Replace(input[i].Substring(input[i].LastIndexOf(' ')), @"\s+//.+?\n", string.Empty);
+            string restOfString = replaceComments.Replace(input[i].Substring(input[i].LastIndexOf(' ')), string.Empty);
 
             var count = restOfString.ToCharArray().Count(x => x == '\"');
 
@@ -38,9 +40,12 @@ public class VMTPreprocessor : IPreprocessor
         return true;
     }
 
+    /// <summary>
+    /// tries to fix misplaced or missing quotation marks in object body
+    /// </summary>
     private string Convert(string input)
     {
-        return string.Empty;
+        return suffixReplacement.Replace(input, string.Empty);
     }
 
     private void CreateBitmap()
