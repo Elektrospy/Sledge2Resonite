@@ -9,9 +9,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using File = System.IO.File;
 using FrooxEngine.Undo;
+using Sledge.Formats.Tokens.Readers;
+using System.Runtime.InteropServices.ComTypes;
+using static NeosAssets.Graphics.LogiX;
 
 namespace Sledge2NeosVR
 {
@@ -35,7 +39,11 @@ namespace Sledge2NeosVR
         [AutoRegisterConfigKey]
         private static ModConfigurationKey<bool> importTexture = new("importTexture", "Import Textures", () => true);
         [AutoRegisterConfigKey]
+        private static ModConfigurationKey<int> importTextureRow = new("Texture rows", "Import Textures number of rows", () => 5);
+        [AutoRegisterConfigKey]
         private static ModConfigurationKey<bool> importMaterial = new("importMaterial", "Import Materials", () => true);
+        [AutoRegisterConfigKey]
+        private static ModConfigurationKey<int> importMaterialRow = new("Material rows", "Import Materials number of rows", () => 5);
 
         public override void OnEngineInit()
         {
@@ -69,10 +77,8 @@ namespace Sledge2NeosVR
                 return true;
             }
         }
-        // end of mod boiler plate code
 
-
-        // data caches
+        // Data caches
         private static Dictionary<string, VtfFile> vtfDictionary = new Dictionary<string, VtfFile>();
         private static Dictionary<string, SerialisedObject> vmtDictionary = new Dictionary<string, SerialisedObject>();
         //private static Dictionary<string, StaticTexture2D> textureDictionary = new Dictionary<string, StaticTexture2D>();
@@ -90,16 +96,15 @@ namespace Sledge2NeosVR
             Msg("create dictionary entries from input files");
             await ParseInputFiles(inputFiles);
             await default(ToWorld);
-            //var slot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Sledge Import");
-            //slot.PositionInFrontOfUser();
             Msg("imported sledge files");
         }
 
         private static async Task ParseInputFiles(IEnumerable<string> inputFiles)
         {
-
             SerialisedObjectFormatter ValveSerialiser = new SerialisedObjectFormatter();
-            var filesArr = inputFiles.ToArray();
+            string[] filesArr = inputFiles.ToArray();
+            int vtfCounter = 0;
+            int vmtCounter = 0;
 
             for (int i = 0; i < filesArr.Count(); ++i)
             {
@@ -122,9 +127,9 @@ namespace Sledge2NeosVR
                     continue;
                 }
 
-                string currentFileName = currentFileInfo.Name;
+                string currentFileName = currentFileInfo.Name.Split('.').First();
                 string currentFileEnding = currentFileInfo.Extension;
-
+                // decide what to do, base on file ending
                 switch (currentFileEnding)
                 {
                     case ".vtf":
@@ -132,20 +137,56 @@ namespace Sledge2NeosVR
                         VtfFile tempVtf = new VtfFile(fs);
                         try
                         {
-                            Msg(string.Format("add vtf {0} to dictionary", currentFileName));
-                            vtfDictionary.Add(currentFileName, tempVtf);
-                            await CreateTextureFromVtf(currentFileName, tempVtf);
+                            if(vtfDictionary.ContainsKey(currentFileName))
+                            {
+                                Msg($"grab vtf {currentFileName} from dictionary");
+                                tempVtf = vtfDictionary[currentFileName];
+                            }
+                            else
+                            {
+                                Msg($"add vtf {currentFileName} to dictionary");
+                                vtfDictionary.Add(currentFileName, tempVtf);
+                            }
                         } catch (Exception e)
                         {
-                            Error(string.Format("couldn't add vtf {0}, error: {1}", currentFileName, e.ToString()));
+                            Error($"couldn't add vtf {currentFileName}, error: {e}");
                         }
+                        // add undoable slot to world, so we can append components
+                        Msg($"add undoable slot \"Texture: {currentFileName}\" to world");
+                        Slot currentSlot;
+                        await default(ToWorld);
+                        try
+                        {
+                            currentSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Texture: " + currentFileName);
+                            currentSlot.CreateSpawnUndoPoint();
+                        }
+                        catch(Exception e) {
+                            Error($"couldn't add Slot \"Texture: {currentFileName}\" to world, error: {e}");
+                            continue;
+                        }
+
+                        // check if this is the first time
+                        if (vtfCounter == 0)
+                        {
+                            currentSlot.PositionInFrontOfUser();
+                        } 
+                        else
+                        {
+                            currentSlot.PositionInFrontOfUser();
+                            float3 offset = UniversalImporter.GridOffset(ref vtfCounter, config.GetValue(importTextureRow));
+                            currentSlot.GlobalPosition += offset;
+                            vtfCounter++;
+                        }
+                        Msg($"add Texture quad to world");
+                        await CreateTextureQuadFromVtf(currentFileName, tempVtf, currentSlot);
                         break;
                     case ".vmt":
-                        Msg("got vmt file, start cleanup / fixing");
+                        Msg("got vmt file, create new VMTPreprocessor");
                         VMTPreprocessor vmtPrePros = new VMTPreprocessor();
                         string[] fileLines;
                         try
                         {
+                            Msg("read all lines from vmt");
                             fileLines = File.ReadAllLines(filesArr[i]);
                         }
                         catch(Exception ex)
@@ -154,33 +195,45 @@ namespace Sledge2NeosVR
                             continue;
                         }
                         // clean up the vmt, before handing it over to format library for parsing
+                        Msg("clean up the vmt, before handing it over to format library for parsing");
                         vmtPrePros.Preprocess(fileLines, out fileLines);
                         // create memory stream as fake FileStream and add cleaned up vmt string array
+                        Msg("create new MemoryStream");
                         MemoryStream memoryStream = new MemoryStream();
+                        Msg("create new StreamWriter");
                         StreamWriter writer = new StreamWriter(memoryStream);
-                        writer.Write(fileLines);
+                        Msg("write lines to writer");
+                        for(int currentLineCount=0; currentLineCount < fileLines.Length; currentLineCount++)
+                        {
+                            writer.Write(fileLines[currentLineCount]);
+                            Msg($"Line {currentLineCount}: {fileLines[currentLineCount]}");
+                        }
+                        writer.Flush();
+                        memoryStream.Seek(0, SeekOrigin.Begin);
                         // try to deserialze stream into list of serialised valve objects
                         Msg("start vmt deserialize");
-                        List<SerialisedObject> tempSerialzeObjectList;
+                        List<SerialisedObject> tempSerialzeObjectList = new();
                         try
                         {
                             tempSerialzeObjectList = ValveSerialiser.Deserialize(memoryStream).ToList();
-
                         } 
-                        catch(Exception ex)
+                        catch(Exception e)
                         {
-                            Error(string.Format("valve deserialize error: {0}", ex.ToString()));
+                            Error($"valve deserialize error: {e}");
                             continue;
                         }
 
                         Msg("finished deserialize of vmt file");
                         foreach (var currentObj in tempSerialzeObjectList)
                         {
-                            Msg(string.Format("current object: {0}", currentObj.Name));
+                            Msg($"current object: {currentObj.Name}");
                             try
                             {
-                                Msg(string.Format("add vmt {0} to dictionary", currentFileName));
-                                vmtDictionary.Add(currentFileName, currentObj);
+                                Msg($"add vmt {currentFileName} to dictionary");
+                                if(!vmtDictionary.ContainsKey(currentObj.Name))
+                                {
+                                    vmtDictionary.Add(currentFileName, currentObj);
+                                }
                                 // does the material contain textures?
                                 if (!shadersWithTexturesHashSet.Contains(currentObj.Name))
                                 {
@@ -202,9 +255,10 @@ namespace Sledge2NeosVR
                                 Error($"couldn't add vmt {currentFileName}");
                             }
                         }
+                        vmtCounter++;
                         break;
                     default:
-                        Error(string.Format("Unknown file ending: {0}", currentFileEnding));
+                        Error($"Unknown file ending: {currentFileEnding}");
                         break;
                 }
 
@@ -217,8 +271,13 @@ namespace Sledge2NeosVR
             {
                 return "";
             }
-            string currentTextureName = currentFullName.Split('/').Last();
-            return currentPath + '/' + currentTextureName;
+            // example paths for merging
+            // texture path from vmt:    "models/props_blackmesa/lamppost03_grey_on"
+            // material path:   "C:/Steam/steamapps/common/Black Mesa/bms/materials/models/props_blackmesa"
+            const string baseFolderName = "/materials/";
+            int materialsIndex = currentPath.IndexOf(baseFolderName);
+            string basePath = currentPath.Substring(materialsIndex, materialsIndex + baseFolderName.Length);
+            return basePath + currentFullName;
         }
 
         private static async Task CreateMaterialOrbsFromDictionary()
@@ -237,151 +296,75 @@ namespace Sledge2NeosVR
 
         private static async Task CreateMaterialOrbFromVmt(string currentVmtName, SerialisedObject currentSerialisedObject)
         {
-            if (currentVmtName == "")
+            if (string.IsNullOrEmpty(currentVmtName))
             {
                 Error("Vtf name is empty!");
                 return;
             }
 
+            await default(ToBackground);
+            VertexLitGenericParser vertexLitGenericParser = new VertexLitGenericParser();
+            var specular = await vertexLitGenericParser.CreateMaterial(currentSerialisedObject.Properties);
+
+            await default(ToWorld);
             var currentSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Material: " + currentVmtName);
             currentSlot.PositionInFrontOfUser();
-            await default(ToBackground);
-            //await SetupTextures(currentVtfFile, )
-            //await SetupSpecular(currentSerialisedObject, currentSlot);
-            VertexLitGenericParser vertexLitGenericParser = new VertexLitGenericParser();
-            await vertexLitGenericParser.CreateMaterialFromProperties(currentSerialisedObject.Properties);
+            var material = currentSlot.CreateMaterialOrb<PBS_Specular>();
+            material = specular;
         }
 
-        private static async Task CreateTextureFromVtf(string currentVtfName, VtfFile currentVtf)
+        private static async Task CreateTextureQuadFromVtf(string currentVtfName, VtfFile currentVtf, Slot currentSlot)
         {
             await default(ToWorld);
-            Msg("creating texture from vtf: " + currentVtfName);
-            var currentSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Texture: " + currentVtfName);
+            Msg("creating texture quad from vtf: " + currentVtfName);
             currentSlot.PositionInFrontOfUser();
             //await default(ToBackground);
-            // currently we only grab the last frame from the image for highest resolution, first for lowest
-            // TODO: add handeling of multi frames textures and generate spirtesheet
-            VtfImage tempVtfImage = currentVtf.Images.GetLast();
-            // create new Bitmap2D to hold our raw image data, disable midmaps and Y axis flip
-            var newBitmap = new Bitmap2D(tempVtfImage.GetBgra32Data(), tempVtfImage.Width, tempVtfImage.Height, TextureFormat.BGRA32, false, false);
+            // currently we only grab the last frame from the image for the highest resolution, first if you want the lowest
+            // TODO: add handling of multi frames textures and generate spirtesheet
+            VtfImage currentVtfImage = currentVtf.Images.GetLast();
+            // create new Bitmap2D to hold our raw image data, disable mipmaps and Y axis flip
+            var newBitmap = new Bitmap2D(currentVtfImage.GetBgra32Data(), currentVtfImage.Width, currentVtfImage.Height, TextureFormat.BGRA32, false, false);
             // creating save asset aysnc to local db
-            var tempUri = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(newBitmap);
+            var currentUri = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(newBitmap);
             await default(ToWorld);
-            Msg($"creating staticTexture2D on: {currentSlot} with Uri {tempUri}");
+            Msg($"creating staticTexture2D on: {currentSlot} with Uri {currentUri}");
             // create texture object and assign attributes
-            StaticTexture2D tempTexture2D = currentSlot.AttachComponent<StaticTexture2D>();
-            tempTexture2D.URL.Value = tempUri;
+            StaticTexture2D currentTexture2D = currentSlot.AttachComponent<StaticTexture2D>();
+            currentTexture2D.URL.Value = currentUri;
+
             // set filtering mode
             if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Pointsample)) 
             {
-                tempTexture2D.FilterMode.Value = TextureFilterMode.Point;
+                currentTexture2D.FilterMode.Value = TextureFilterMode.Point;
             }
             else if(currentVtf.Header.Flags.HasFlag(VtfImageFlag.Trilinear))
             {
-                tempTexture2D.FilterMode.Value = TextureFilterMode.Trilinear;
+                currentTexture2D.FilterMode.Value = TextureFilterMode.Trilinear;
             }
             else 
             {
-                tempTexture2D.FilterMode.Value = TextureFilterMode.Anisotropic;
-                tempTexture2D.AnisotropicLevel.Value = 8;
+                currentTexture2D.FilterMode.Value = TextureFilterMode.Anisotropic;
+                currentTexture2D.AnisotropicLevel.Value = 8;
             }
-            // check if normalmap
-            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Normal))
+
+            // check if normalmap flag is set and the name contains "_normal"
+            // come textures contain "flawed" flags within the header
+            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Normal) && currentVtfName.ToLower().Contains("_normal"))
             {
-                tempTexture2D.IsNormalMap.Value = true;
-                // source engine uses the DirectX standard for normal maps, NeosVR uses OpenGL
+                currentTexture2D.IsNormalMap.Value = true;
+                // Source engine uses the DirectX standard for normal maps, NeosVR uses OpenGL
                 // so we need to invert the green channel
                 // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
-                tempTexture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
+                currentTexture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
             }
+
             // spawn texture quad in world
             // TODO: maybe change to ImageImporter.ImportImage(uri, slot) method
-            ImageImporter.SetupTextureProxyComponents(currentSlot, tempTexture2D, StereoLayout.None, ImageProjection.Perspective, false);
-            ImageImporter.CreateQuad(currentSlot, tempTexture2D, StereoLayout.None, true);
+            ImageImporter.SetupTextureProxyComponents(currentSlot, currentTexture2D, StereoLayout.None, ImageProjection.Perspective, false);
+            ImageImporter.CreateQuad(currentSlot, currentTexture2D, StereoLayout.None, true);
             // make the quad grabbable
             currentSlot.AttachComponent<Grabbable>().Scalable.Value = true;
-            // make undoable
-            currentSlot.CreateSpawnUndoPoint();
             Msg("creating texture (hopefully) succesfull!");
         }
-
-
-        private static async Task SetupSpecular(SerialisedObject currentSerialisedObject, Slot slot)
-        {
-            await new ToBackground();
-            LocalDB localDb = slot.World.Engine.LocalDB;
-
-            slot.CreateMaterialOrb<PBS_Specular>();
-            var neosMat = slot.GetComponent<PBS_Specular>();
-            StaticTexture2D tex = null;
-
-            Msg(string.Format("Create specular material from vmt {0}", currentSerialisedObject.Name));
-
-            //// grab textures from vmt properties
-            //foreach (KeyValuePair<string, string> currentProperty in currentSerialisedObject.Properties)
-            //{
-            //    // handle specific textures
-            //    if (propertyTextureNamesHashSet.Contains(currentProperty.Key))
-            //    {
-            //        string currentTextureName = currentProperty.Value.Split('/').Last();
-            //        if(!vtfDictionary.ContainsKey(currentTextureName))
-            //        {
-            //            Error(string.Format("couldn't find texture {0} in dictionary, skipping", currentTextureName));
-            //            continue;
-            //        }
-
-            //        VtfFile tempVtf;
-            //        vtfDictionary.TryGetValue(currentTextureName, out tempVtf);
-            //        VtfImage tempVtfImage = tempVtf.Images.GetFirst();
-
-            //        // encode 
-            //        var newBitmap = new Bitmap2D(tempVtfImage.GetBgra32Data(), tempVtfImage.Width, tempVtfImage.Height, TextureFormat.BGRA32, false);
-            //        var tempUri = await localDb.SaveAssetAsync(newBitmap).ConfigureAwait(false);
-            //        StaticTexture2D tempTexture2D = slot.AttachComponent<StaticTexture2D>();
-            //        tempTexture2D.URL.Value = tempUri;
-
-            //        switch(currentProperty.Key)
-            //        {
-            //            case "$basetexture":
-            //                neosMat.AlbedoTexture.Target = tempTexture2D;
-            //                break;
-            //            case "$detail":
-            //                neosMat.DetailAlbedoTexture.Target = tempTexture2D;
-            //                break;
-            //            case "$normalmap":
-            //            case "$bumpmap":
-            //                tempTexture2D.IsNormalMap.Value = true;
-            //                neosMat.NormalMap.Target = tempTexture2D;
-            //                break;
-            //            case "$envmapmask":
-            //                break;
-            //        }
-            //    }
-
-            //    // handle render specific keys
-            //    switch (currentProperty.Key)
-            //    {
-            //        case "$alphatest":
-            //            if(currentProperty.Value == "1")
-            //            {
-            //                neosMat.BlendMode.Value = BlendMode.Cutout;
-            //            }
-            //            break;
-            //        case "$alphatestreference":
-            //            if (float.TryParse(currentProperty.Value, out float parsed))
-            //                neosMat.AlphaCutoff.Value = parsed;
-            //            else
-            //                neosMat.AlphaCutoff.Value = 1f;
-            //            break;
-            //        case "$translucent":
-            //            if (currentProperty.Value == "1")
-            //            {
-            //                neosMat.BlendMode.Value = BlendMode.Cutout;
-            //            }
-            //            break;
-            //    }
-            //}
-        }
-
     }
 }

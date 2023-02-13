@@ -5,14 +5,11 @@ using System.Threading.Tasks;
 
 namespace Sledge2NeosVR;
 
-public class LightMappedGeneric : PBSMaterialParser<IPBS_Specular>
+public class LightMappedGeneric : PBSSpecularParser
 {
-    protected override Uri ShaderURL => throw new NotImplementedException();
-
-    // More details at: https://developer.valvesoftware.com/wiki/LightmappedGeneric
-    public async Task<PBS_Material> CreateMaterialFromProperties(List<KeyValuePair<string, string>> properties)
+    public override Task<PBS_Specular> CreateMaterial(List<KeyValuePair<string, string>> properties)
     {
-        PBS_Material resultMaterial = await CreateMaterial(properties);
-        return resultMaterial;
+        var material = base.CreateMaterial(properties);
+        return material;
     }
 }

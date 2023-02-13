@@ -65,9 +65,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Materials\LightMappedGeneric.cs" />
-    <Compile Include="Materials\PBSMaterialParser.cs" />
+    <Compile Include="Materials\PBSSpecularParser.cs" />
     <Compile Include="Materials\VertexLitGenericParser.cs" />
-    <Compile Include="Preprocessor\IPreprocessor.cs" />
+    <Compile Include="Preprocessor\Preprocessor.cs" />
     <Compile Include="Sledge2NeosVRMod.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Preprocessor\VMTPreprocessor.cs" />
