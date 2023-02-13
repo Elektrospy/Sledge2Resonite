@@ -20,8 +20,8 @@ Thanks go to these wonderful people
 	<tbody>
 		<tr>
 			<td align="center"><a href="https://github.com/dfgHiatus"><img src="https://avatars.githubusercontent.com/u/51272212?v=4?s=100" width="100px;" alt="dfgHiatus"/><br /><sub><b>dfgHiatus</b></sub></a><br/></td>
-			<td align="center"><a href="https://github.com/ukilop"><img src="https://avatars.githubusercontent.com/u/1341270?v=v?s=100" width="100px;" alt="Ukilop"/><br /><sub><b>Ukilop</b></sub></a><br/></td>
-			<td align="center"><a href="https://github.com/marsmaantje"><img src="https://avatars.githubusercontent.com/u/60362806?v=4?s=100" width="100px;" alt="marsmaantje"/><br /><sub><b>Ukilop</b></sub></a><br/></td>
+			<td align="center"><a href="https://github.com/ukilop"><img src="https://avatars.githubusercontent.com/u/1341270?v=v?s=100" width="100px;" alt="ukilop"/><br /><sub><b>ukilop</b></sub></a><br/></td>
+			<td align="center"><a href="https://github.com/marsmaantje"><img src="https://avatars.githubusercontent.com/u/60362806?v=4?s=100" width="100px;" alt="marsmaantje"/><br /><sub><b>marsmaantje</b></sub></a><br/></td>
 		</tr>
 	</tbody>
 </table>
