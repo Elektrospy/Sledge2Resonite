@@ -183,77 +183,55 @@ namespace Sledge2NeosVR
                     case ".vmt":
                         Msg("got vmt file, create new VMTPreprocessor");
                         VMTPreprocessor vmtPrePros = new VMTPreprocessor();
-                        string[] fileLines;
+                        string fileLines;
                         try
                         {
                             Msg("read all lines from vmt");
-                            fileLines = File.ReadAllLines(filesArr[i]);
+                            fileLines = File.ReadAllText(filesArr[i]);
                         }
-                        catch(Exception ex)
+                        catch(Exception e)
                         {
-                            Error(string.Format("file read all lines error: {0}", ex.ToString()));
+                            Error(string.Format("file read all lines error: {0}", e.ToString()));
                             continue;
                         }
                         // clean up the vmt, before handing it over to format library for parsing
                         Msg("clean up the vmt, before handing it over to format library for parsing");
-                        vmtPrePros.Preprocess(fileLines, out fileLines);
-                        // create memory stream as fake FileStream and add cleaned up vmt string array
-                        Msg("create new MemoryStream");
-                        MemoryStream memoryStream = new MemoryStream();
-                        Msg("create new StreamWriter");
-                        StreamWriter writer = new StreamWriter(memoryStream);
-                        Msg("write lines to writer");
-                        for(int currentLineCount=0; currentLineCount < fileLines.Length; currentLineCount++)
-                        {
-                            writer.Write(fileLines[currentLineCount]);
-                            Msg($"Line {currentLineCount}: {fileLines[currentLineCount]}");
-                        }
-                        writer.Flush();
-                        memoryStream.Seek(0, SeekOrigin.Begin);
-                        // try to deserialze stream into list of serialised valve objects
-                        Msg("start vmt deserialize");
+                        vmtPrePros.ParseVmt(fileLines, out fileLines);
+                        Msg("create new List<SerialisedObject>");
                         List<SerialisedObject> tempSerialzeObjectList = new();
-                        try
+                        Msg("create new memoryStream and add parsed VMT lines");
+                        using (MemoryStream memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(fileLines)))
                         {
-                            tempSerialzeObjectList = ValveSerialiser.Deserialize(memoryStream).ToList();
-                        } 
-                        catch(Exception e)
-                        {
-                            Error($"valve deserialize error: {e}");
-                            continue;
+                            try
+                            {
+                                Msg("try to seserialize VMT memoryStream");
+                                tempSerialzeObjectList = ValveSerialiser.Deserialize(memoryStream).ToList();
+                            }
+                            catch (Exception e)
+                            {
+                                Error($"valve deserialize error: {e}");
+                                continue;
+                            }
                         }
 
                         Msg("finished deserialize of vmt file");
-                        foreach (var currentObj in tempSerialzeObjectList)
+                        var firstVmtObject = tempSerialzeObjectList.First();
+
+                        Msg($"add vmt {currentFileName} to dictionary");
+                        if (!vmtDictionary.ContainsKey(firstVmtObject.Name))
                         {
-                            Msg($"current object: {currentObj.Name}");
-                            try
-                            {
-                                Msg($"add vmt {currentFileName} to dictionary");
-                                if(!vmtDictionary.ContainsKey(currentObj.Name))
-                                {
-                                    vmtDictionary.Add(currentFileName, currentObj);
-                                }
-                                // does the material contain textures?
-                                if (!shadersWithTexturesHashSet.Contains(currentObj.Name))
-                                {
-                                    Error(string.Format("current object doesn't contain texture: {0}", currentObj.Name));
-                                    continue;
-                                }
-                                // grab textures from vmt properties
-                                foreach (KeyValuePair<string, string> currentProperty in currentObj.Properties)
-                                {
-                                    if (propertyTextureNamesHashSet.Contains(currentProperty.Key))
-                                    {
-                                        string fullPath = MergeTextureNameAndPath(currentProperty.Value, currentFileInfo.FullName);
-                                        await ParseInputFiles(new string[] { fullPath });
-                                    }
-                                }
-                            }
-                            catch (Exception)
-                            {
-                                Error($"couldn't add vmt {currentFileName}");
-                            }
+                            vmtDictionary.Add(currentFileName, firstVmtObject);
+                        }
+
+                        Msg("create material orb from vmt inside dictionary");
+                        if ( vmtDictionary.ContainsKey(currentFileName))
+                        {
+
+                            await CreateMaterialOrbFromVmt(currentFileName, firstVmtObject);
+                        }
+                        else
+                        {
+                            Error($"Couldn't find ");
                         }
                         vmtCounter++;
                         break;

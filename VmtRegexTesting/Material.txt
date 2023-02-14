@@ -1,0 +1,19 @@
+﻿"VertexLitGeneric"
+{
+	"$basetexture" 								"models/props_xen/interloper/holograms/conveyor_shields_across"
+	"$translucent" 								"1"
+	"$additive" 								"1"
+	"$nocull"									"1"
+	
+	"$model"									"1"	
+	
+	"$emissiveBlendEnabled" 					"1"
+	"$emissiveBlendTint" 						"{40 180 200}"
+ 	"$emissiveBlendTexture" 					"models\props_xen\interloper\holograms\noise01"
+	"$emissiveBlendBaseTexture" 				"models\props_xen\interloper\holograms\conveyor_shields_across"
+	"$emissiveBlendFlowTexture" 				"models\props_xen\interloper\holograms\down_flow" 				//Can use a flow mask that scrolls to create disruptive patterns. Use white for just basic glow.
+	"$emissiveBlendStrength" 					"1" 															//Strength of glow. Can be controlled via proxy for variable glow.
+	"$emissiveBlendScrollVector" 				"[0.05 0.05]" 
+	"$sheenpassenabled" 						"1"
+}
+
