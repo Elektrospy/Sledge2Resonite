@@ -79,15 +79,16 @@ namespace Sledge2NeosVR
         }
 
         // Data caches
-        private static Dictionary<string, VtfFile> vtfDictionary = new Dictionary<string, VtfFile>();
-        private static Dictionary<string, SerialisedObject> vmtDictionary = new Dictionary<string, SerialisedObject>();
+        public static Dictionary<string, VtfFile> vtfDictionary = new Dictionary<string, VtfFile>();
+        public static Dictionary<string, SerialisedObject> vmtDictionary = new Dictionary<string, SerialisedObject>();
         //private static Dictionary<string, StaticTexture2D> textureDictionary = new Dictionary<string, StaticTexture2D>();
         // preset values and look up lists
         private static readonly HashSet<string> shadersWithTexturesHashSet = new HashSet<string>() {
             "LightmappedGeneric", "VertexLitGeneric", "UnlitGeneric"
         };
 
-        private static readonly HashSet<string> propertyTextureNamesHashSet = new HashSet<string>() {
+        protected static readonly HashSet<string> propertyTextureNamesHashSet = new HashSet<string>()
+        {
             "$basetexture", "$detail", "$normalmap", "$bumpmap", "$envmapmask"
         };
         private static async Task ProcessSledgeImport(IEnumerable<string> inputFiles, World world)
@@ -204,7 +205,7 @@ namespace Sledge2NeosVR
                         {
                             try
                             {
-                                Msg("try to seserialize VMT memoryStream");
+                                Msg("try to deserialize VMT memoryStream");
                                 tempSerialzeObjectList = ValveSerialiser.Deserialize(memoryStream).ToList();
                             }
                             catch (Exception e)
@@ -223,15 +224,34 @@ namespace Sledge2NeosVR
                             vmtDictionary.Add(currentFileName, firstVmtObject);
                         }
 
-                        Msg("create material orb from vmt inside dictionary");
-                        if ( vmtDictionary.ContainsKey(currentFileName))
+                        Msg($"try to grab all necessary textures from material {currentFileName}");
+                        // propertyTextureNamesHashSet -> hashset to compare against
+                        foreach (KeyValuePair<string, string> currentProperty in firstVmtObject.Properties)
                         {
+                            if (propertyTextureNamesHashSet.Contains(currentProperty.Key))
+                            {
+                                Msg($"Property {currentProperty.Key} matched valid texture type, try to import!");
+                                string tempTexturePath = MergeTextureNameAndPath(currentProperty.Value, filesArr[i]);
+                                if(!String.IsNullOrEmpty(tempTexturePath)) {
+                                    Msg($"got usable texture path {tempTexturePath}");
+                                    await ParseInputFiles(new string[] { tempTexturePath });
+                                }
+                                else
+                                {
+                                    Error("texture path is empty or null!");
+                                }
+                            }
+                        }
 
+                        // try to create material orb from dictionary
+                        if (vmtDictionary.ContainsKey(currentFileName))
+                        {
+                            Msg("create material orb from vmt inside dictionary");
                             await CreateMaterialOrbFromVmt(currentFileName, firstVmtObject);
                         }
                         else
                         {
-                            Error($"Couldn't find ");
+                            Error($"Couldn't find {currentFileName} in vmt dictionary");
                         }
                         vmtCounter++;
                         break;
@@ -243,19 +263,35 @@ namespace Sledge2NeosVR
             }
         }
 
-        private static string MergeTextureNameAndPath(string currentFullName, string currentPath)
+        private static string MergeTextureNameAndPath(string textureName, string materialPath)
         {
-            if(String.IsNullOrEmpty(currentFullName) || String.IsNullOrEmpty(currentPath))
+            if(String.IsNullOrEmpty(textureName) || String.IsNullOrEmpty(materialPath))
             {
-                return "";
+                return string.Empty;
+            }
+            else
+            {
+                Msg($"textureName: {textureName}, materialPath: {materialPath}");
             }
             // example paths for merging
-            // texture path from vmt:    "models/props_blackmesa/lamppost03_grey_on"
-            // material path:   "C:/Steam/steamapps/common/Black Mesa/bms/materials/models/props_blackmesa"
-            const string baseFolderName = "/materials/";
-            int materialsIndex = currentPath.IndexOf(baseFolderName);
-            string basePath = currentPath.Substring(materialsIndex, materialsIndex + baseFolderName.Length);
-            return basePath + currentFullName;
+            // texture path from vmt:    "models\props_blackmesa\lamppost03_grey_on"
+            // material path:   "C:\Steam\steamapps\common\Black Mesa\bms\materials\models\props_blackmesa"
+            // flip "/" to "\" for texture path
+            textureName = textureName.Replace("/", "\\");
+            const string baseFolderName = "\\materials\\";
+            try
+            {
+                materialPath = materialPath.Substring(0, materialPath.LastIndexOf(baseFolderName));
+                // D:\Steam\steamapps\common\Black Mesa\bmsconsole\background01.vtf
+                string resultTexturePath = materialPath + baseFolderName + textureName + ".vtf";
+                Msg($"texture path: {resultTexturePath}");
+                return resultTexturePath;
+            }
+            catch(Exception ex)
+            {
+                Error($"substring error: {ex}");
+                return string.Empty;
+            }
         }
 
         private static async Task CreateMaterialOrbsFromDictionary()
@@ -279,15 +315,21 @@ namespace Sledge2NeosVR
                 Error("Vtf name is empty!");
                 return;
             }
-
+            Msg("CreateMaterialOrbFromVmt: ToBackground");
             await default(ToBackground);
+            Msg("CreateMaterialOrbFromVmt: create new VertexLitGenericParser");
             VertexLitGenericParser vertexLitGenericParser = new VertexLitGenericParser();
+            Msg("CreateMaterialOrbFromVmt: CreateMaterial()");
             var specular = await vertexLitGenericParser.CreateMaterial(currentSerialisedObject.Properties);
 
+            Msg("CreateMaterialOrbFromVmt: ToWorld");
             await default(ToWorld);
+            Msg($"CreateMaterialOrbFromVmt: AddSlot Material: {currentVmtName}");
             var currentSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Material: " + currentVmtName);
             currentSlot.PositionInFrontOfUser();
+            Msg($"CreateMaterialOrbFromVmt: CreateMaterialOrb PBS_SPecular");
             var material = currentSlot.CreateMaterialOrb<PBS_Specular>();
+            Msg($"CreateMaterialOrbFromVmt: assign material");
             material = specular;
         }
 

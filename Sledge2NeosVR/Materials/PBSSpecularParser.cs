@@ -64,7 +64,7 @@ public abstract class PBSSpecularParser
     {
         PBS_Specular currentMaterial = new PBS_Specular();
 
-        Dictionary<string, VtfFile> vtfDictionary = new Dictionary<string, VtfFile>();
+        //Dictionary<string, VtfFile> vtfDictionary = new Dictionary<string, VtfFile>();
 
         foreach (KeyValuePair<string, string> currentProperty in properties)
         {
@@ -75,19 +75,20 @@ public abstract class PBSSpecularParser
             }
 
             string currentTextureName = currentProperty.Value.Split('/').Last();
+            /*
             if (!vtfDictionary.ContainsKey(currentTextureName))
             {
-                UniLog.Error($"Couldn't find texture {currentTextureName} in dictionary, skipping");
+                UniLog.Error($"Couldn't find texture {currentTextureName} in dictionary, skipping texture parsing!");
                 continue;
             }
-
-            if (vtfDictionary.TryGetValue(currentTextureName, out VtfFile currentVtf))
+            */
+            if (Sledge2NeosVR.vtfDictionary.TryGetValue(currentTextureName, out VtfFile currentVtf))
             {
                 UniLog.Error($"Texture was not found with name {currentTextureName}");
                 continue;
             }
 
-            // VTF contains the mip-maps baked in, we only care about the last original image
+            // VTF contains mip-maps, but we only care about the last original image
             VtfImage currentVtfImage = currentVtf.Images.GetLast();
 
             var newBitmap = new Bitmap2D(currentVtfImage.GetBgra32Data(), currentVtfImage.Width, currentVtfImage.Height, TextureFormat.BGRA32, false);
