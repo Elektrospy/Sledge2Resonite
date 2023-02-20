@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Floats" />
     <None Remove="NewFile1.txt" />
   </ItemGroup>
 

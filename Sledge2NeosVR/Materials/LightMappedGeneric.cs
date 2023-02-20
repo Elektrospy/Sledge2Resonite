@@ -7,9 +7,9 @@ namespace Sledge2NeosVR;
 
 public class LightMappedGeneric : PBSSpecularParser
 {
-    public override Task<PBS_Specular> CreateMaterial(List<KeyValuePair<string, string>> properties)
+    public override Task<PBS_Specular> ParseMaterial(List<KeyValuePair<string, string>> properties, string name)
     {
-        var material = base.CreateMaterial(properties);
+        var material = base.ParseMaterial(properties, name);
         return material;
     }
 }

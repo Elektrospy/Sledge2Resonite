@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Sledge2NeosVR;
@@ -23,12 +22,6 @@ public abstract class Preprocessor
 
     protected bool Preprocess(string input)
     {
-        if (input.Length == 0)
-        {
-            return false;
-        }
-
-        // Regex to identify valid prefixes
-        return true;
+        return input.Length != 0;
     }
 }

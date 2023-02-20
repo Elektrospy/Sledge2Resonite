@@ -16,6 +16,7 @@ using FrooxEngine.Undo;
 using Sledge.Formats.Tokens.Readers;
 using System.Runtime.InteropServices.ComTypes;
 using static NeosAssets.Graphics.LogiX;
+using UnityEngine;
 
 namespace Sledge2NeosVR
 {
@@ -95,12 +96,20 @@ namespace Sledge2NeosVR
         {
             await default(ToBackground);
             Msg("create dictionary entries from input files");
-            await ParseInputFiles(inputFiles);
+            await ParseInputFiles(inputFiles, true);
             await default(ToWorld);
-            Msg("imported sledge files");
+            Msg("imported sledge files, clear dictionaries");
+            ClearDictionaries();
+            Msg("dictionaries cleared");
         }
 
-        private static async Task ParseInputFiles(IEnumerable<string> inputFiles)
+        private static void ClearDictionaries()
+        {
+            vmtDictionary.Clear();
+            vtfDictionary.Clear();
+        }
+
+        private static async Task ParseInputFiles(IEnumerable<string> inputFiles, bool createQuads = false)
         {
             SerialisedObjectFormatter ValveSerialiser = new SerialisedObjectFormatter();
             string[] filesArr = inputFiles.ToArray();
@@ -148,10 +157,14 @@ namespace Sledge2NeosVR
                                 Msg($"add vtf {currentFileName} to dictionary");
                                 vtfDictionary.Add(currentFileName, tempVtf);
                             }
-                        } catch (Exception e)
+                        } 
+                        catch (Exception e)
                         {
                             Error($"couldn't add vtf {currentFileName}, error: {e}");
                         }
+
+                        if (!createQuads) return;
+
                         // add undoable slot to world, so we can append components
                         Msg($"add undoable slot \"Texture: {currentFileName}\" to world");
                         Slot currentSlot;
@@ -190,9 +203,9 @@ namespace Sledge2NeosVR
                             Msg("read all lines from vmt");
                             fileLines = File.ReadAllText(filesArr[i]);
                         }
-                        catch(Exception e)
+                        catch(Exception ex)
                         {
-                            Error(string.Format("file read all lines error: {0}", e.ToString()));
+                            Error($"file read all lines error: {ex}");
                             continue;
                         }
                         // clean up the vmt, before handing it over to format library for parsing
@@ -232,9 +245,9 @@ namespace Sledge2NeosVR
                             {
                                 Msg($"Property {currentProperty.Key} matched valid texture type, try to import!");
                                 string tempTexturePath = MergeTextureNameAndPath(currentProperty.Value, filesArr[i]);
-                                if(!String.IsNullOrEmpty(tempTexturePath)) {
+                                if (!string.IsNullOrEmpty(tempTexturePath)) {
                                     Msg($"got usable texture path {tempTexturePath}");
-                                    await ParseInputFiles(new string[] { tempTexturePath });
+                                    ParseInputFiles(new string[] { tempTexturePath });
                                 }
                                 else
                                 {
@@ -265,14 +278,13 @@ namespace Sledge2NeosVR
 
         private static string MergeTextureNameAndPath(string textureName, string materialPath)
         {
-            if(String.IsNullOrEmpty(textureName) || String.IsNullOrEmpty(materialPath))
+            if (string.IsNullOrEmpty(textureName) || string.IsNullOrEmpty(materialPath))
             {
                 return string.Empty;
             }
-            else
-            {
-                Msg($"textureName: {textureName}, materialPath: {materialPath}");
-            }
+
+            Msg($"textureName: {textureName}, materialPath: {materialPath}");
+            
             // example paths for merging
             // texture path from vmt:    "models\props_blackmesa\lamppost03_grey_on"
             // material path:   "C:\Steam\steamapps\common\Black Mesa\bms\materials\models\props_blackmesa"
@@ -287,24 +299,10 @@ namespace Sledge2NeosVR
                 Msg($"texture path: {resultTexturePath}");
                 return resultTexturePath;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Error($"substring error: {ex}");
                 return string.Empty;
-            }
-        }
-
-        private static async Task CreateMaterialOrbsFromDictionary()
-        {
-            int counter = 1;
-            foreach (var currentEntry in vmtDictionary)
-            {
-                await default(ToWorld); 
-                var slot = Engine.Current.WorldManager.FocusedWorld.AddSlot(currentEntry.Key);
-                slot.PositionInFrontOfUser();
-                slot.GlobalPosition = slot.GlobalPosition + new float3(counter * .2f, 0f, 0f);
-                await default(ToBackground);
-                await CreateMaterialOrbFromVmt(currentEntry.Key, currentEntry.Value);
             }
         }
 
@@ -315,22 +313,14 @@ namespace Sledge2NeosVR
                 Error("Vtf name is empty!");
                 return;
             }
+
             Msg("CreateMaterialOrbFromVmt: ToBackground");
             await default(ToBackground);
             Msg("CreateMaterialOrbFromVmt: create new VertexLitGenericParser");
             VertexLitGenericParser vertexLitGenericParser = new VertexLitGenericParser();
             Msg("CreateMaterialOrbFromVmt: CreateMaterial()");
-            var specular = await vertexLitGenericParser.CreateMaterial(currentSerialisedObject.Properties);
-
-            Msg("CreateMaterialOrbFromVmt: ToWorld");
-            await default(ToWorld);
-            Msg($"CreateMaterialOrbFromVmt: AddSlot Material: {currentVmtName}");
-            var currentSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Material: " + currentVmtName);
-            currentSlot.PositionInFrontOfUser();
-            Msg($"CreateMaterialOrbFromVmt: CreateMaterialOrb PBS_SPecular");
-            var material = currentSlot.CreateMaterialOrb<PBS_Specular>();
-            Msg($"CreateMaterialOrbFromVmt: assign material");
-            material = specular;
+            await vertexLitGenericParser.ParseMaterial(currentSerialisedObject.Properties, currentVmtName);
+            Msg("Post");
         }
 
         private static async Task CreateTextureQuadFromVtf(string currentVtfName, VtfFile currentVtf, Slot currentSlot)
@@ -343,7 +333,7 @@ namespace Sledge2NeosVR
             // TODO: add handling of multi frames textures and generate spirtesheet
             VtfImage currentVtfImage = currentVtf.Images.GetLast();
             // create new Bitmap2D to hold our raw image data, disable mipmaps and Y axis flip
-            var newBitmap = new Bitmap2D(currentVtfImage.GetBgra32Data(), currentVtfImage.Width, currentVtfImage.Height, TextureFormat.BGRA32, false, false);
+            var newBitmap = new Bitmap2D(currentVtfImage.GetBgra32Data(), currentVtfImage.Width, currentVtfImage.Height, CodeX.TextureFormat.BGRA32, false, false);
             // creating save asset aysnc to local db
             var currentUri = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(newBitmap);
             await default(ToWorld);

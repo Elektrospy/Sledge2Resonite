@@ -2,18 +2,21 @@
 using CodeX;
 using FrooxEngine;
 using Sledge.Formats.Texture.Vtf;
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 /*
  * --- Albedo texture ---
  * "$basetexture" "some/path/texturename" -> Albedo texture
- * "$color" "[ 1 1 1 ]" -> Albedo color tint (RGB format)
+ * "$color" "[1 1 1]" -> Albedo color tint (RGB format)
  * "$basetexturetransform" <matrix> -> center .5 .5 scale 1 1 rotate 0 translate 0 0 -> TODO: get more details
  * --- Detail texture ---
  * "$detail" "some/path/texturename" -> Detail albedo texture
- * "$detailscale" "3" -> Detail albedo texture scale
+ * "$detailscale" "1" -> Detail albedo texture scale, default = 4 if not specified
  * "$detailtint" "[.5 .5 .5]" -> Detail texture color tint (RGB format)
  * "$detailtexturetransform" <matrix> -> center .5 .5 scale 1 1 rotate 0 translate 0 0 -> TODO: get more details
  * --- Normal map ---
@@ -50,51 +53,50 @@ using System.Threading.Tasks;
 
 namespace Sledge2NeosVR;
 
-/// <summary>
-/// 
-/// </summary>
 public abstract class PBSSpecularParser
 {
     protected readonly HashSet<string> propertyTextureNamesHashSet = new HashSet<string>()
     {
-        "$basetexture", "$detail", "$normalmap", "$bumpmap", "$envmapmask", "$normalmapalphaenvmapmask"
+        "$basetexture", "$detail", "$normalmap", "$bumpmap", "$envmapmask, $ambientoccltexture"
     };
 
-    public virtual async Task<PBS_Specular> CreateMaterial(List<KeyValuePair<string, string>> properties)
+    public virtual async Task<PBS_Specular> ParseMaterial(List<KeyValuePair<string, string>> properties, string name)
     {
-        PBS_Specular currentMaterial = new PBS_Specular();
+        await default(ToWorld);
+        var currentSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Material: " + name);
+        currentSlot.PositionInFrontOfUser();
+        var currentMaterial = currentSlot.CreateMaterialOrb<PBS_Specular>();
+        await default(ToBackground);
 
-        //Dictionary<string, VtfFile> vtfDictionary = new Dictionary<string, VtfFile>();
+        Uri albedoURLCopy = null;
 
         foreach (KeyValuePair<string, string> currentProperty in properties)
         {
             if (!propertyTextureNamesHashSet.Contains(currentProperty.Key))
             {
-                UniLog.Error($"Property {currentProperty.Key} was not a propertyTextureName!");
                 continue;
             }
 
+            // get texture name and try to grab it from dictionary
             string currentTextureName = currentProperty.Value.Split('/').Last();
-            /*
-            if (!vtfDictionary.ContainsKey(currentTextureName))
+            if (!Sledge2NeosVR.vtfDictionary.TryGetValue(currentTextureName, out VtfFile currentVtf))
             {
-                UniLog.Error($"Couldn't find texture {currentTextureName} in dictionary, skipping texture parsing!");
-                continue;
-            }
-            */
-            if (Sledge2NeosVR.vtfDictionary.TryGetValue(currentTextureName, out VtfFile currentVtf))
-            {
-                UniLog.Error($"Texture was not found with name {currentTextureName}");
+                UniLog.Error($"Texture was not found in dictionary with name {currentTextureName}");
+
+                foreach (var types in Sledge2NeosVR.vtfDictionary)
+                {
+                    UniLog.Log(types.Key + ", " + types.Value);
+                }
+
                 continue;
             }
 
             // VTF contains mip-maps, but we only care about the last original image
             VtfImage currentVtfImage = currentVtf.Images.GetLast();
-
             var newBitmap = new Bitmap2D(currentVtfImage.GetBgra32Data(), currentVtfImage.Width, currentVtfImage.Height, TextureFormat.BGRA32, false);
-            var currentUri = await Engine.Current.LocalDB.SaveAssetAsync(newBitmap).ConfigureAwait(false);
-            StaticTexture2D currentTexture2D = new StaticTexture2D();
-            currentTexture2D.URL.Value = currentUri;
+            await default(ToWorld);
+            StaticTexture2D currentTexture2D = currentSlot.AttachComponent<StaticTexture2D>();
+            currentTexture2D.URL.Value = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(newBitmap);
 
             if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Pointsample))
             {
@@ -110,67 +112,186 @@ public abstract class PBSSpecularParser
                 currentTexture2D.AnisotropicLevel.Value = 8;
             }
 
-            // It is assumed that there will be at most one
+            // It is assumed that there will be at least one
             switch (currentProperty.Key)
             {
                 case "$basetexture":
+                    await default(ToWorld);
+                    albedoURLCopy = currentTexture2D.URL.Value;
                     currentMaterial.AlbedoTexture.Target = currentTexture2D;
-                    ExtractAlpha(Source.ALBEDO,  currentTexture2D, ref currentMaterial, ref properties);
+
+                    if (!currentMaterial.SpecularMap.IsAssetAvailable)
+                    {
+                        foreach (KeyValuePair<string, string> canidate in properties)
+                        {
+                            if (canidate.Key == "$basealphaenvmapmask" && canidate.Value == "1")
+                            {
+                                currentMaterial.SpecularMap.Target = currentTexture2D;
+                                break;
+                            }
+                        }
+                    }
+
+                    await default(ToBackground);
                     break;
                 case "$detail":
+                    await default(ToWorld);
                     currentMaterial.DetailAlbedoTexture.Target = currentTexture2D;
+                    await default(ToBackground);
                     break;
                 case "$normalmap":
                 case "$bumpmap":
                     // Source engine uses the DirectX standard for normal maps, NeosVR uses OpenGL
                     // So we need to invert the green channel
                     // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
+
+                    // Determine if envmaptint exists
+                    bool flag = true;
+                    float3 tint = float3.Zero;
+                    tint = new float3(0.4f, 0.4f, 0.4f);
+
+                    await default(ToWorld);
                     currentTexture2D.IsNormalMap.Value = true;
-                    currentTexture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
                     currentMaterial.NormalMap.Target = currentTexture2D;
-                    ExtractAlpha(Source.NORMAL, currentTexture2D, ref currentMaterial, ref properties);
+                    await default(ToBackground);
+
+                    if (albedoURLCopy is not null && currentMaterial.AlbedoTexture is not null)
+                    {
+                        await default(ToWorld);
+                        var modifiedAlbedoTexture = currentSlot.AttachComponent<StaticTexture2D>();
+                        modifiedAlbedoTexture.URL.Value = albedoURLCopy;
+                        await default(ToBackground);
+
+                        if (flag)
+                        {
+                            UniLog.Log("got the tint lmao");
+                            var newColor = new color(
+                                tint.x,
+                                tint.y,
+                                tint.z);
+                            modifiedAlbedoTexture.ProcessPixels((color c) => c * newColor);
+                        }
+                        else
+                        {
+                            UniLog.Log("no tint kek");
+                        }
+
+                        modifiedAlbedoTexture.ProcessBitmap((Bitmap2D albedo) =>
+                        {
+                            UniLog.Log("preprocessing pixels1");
+                            return CreateSpecularByAlphaTransfer(albedo, newBitmap);
+                        });
+
+                        await default(ToWorld);
+                        currentMaterial.SpecularMap.Target = modifiedAlbedoTexture;
+                        await default(ToBackground);
+                    }
+
                     break;
-                case "$envmapmask":
-                    ExtractAlpha(Source.SPECULAR, currentTexture2D, ref currentMaterial, ref properties);
+                case "$envmaptint":
+                    tint = new float3(0.4f, 0.4f, 0.4f);
+                    //if (Float3Extensions.GetFloat3FromString(currentProperty.Value, out float3 val))
+                    //{
+                    //    UniLog.Log("Parsed float3 with " + val);
+                    //    tint = val;
+                    //}
+                    //else
+                    //{
+                    //    UniLog.Log("Failed to parse float3 with " + val);
+                    //    tint = float3.Zero;
+                    //}
                     break;
             }
         }
+
+        // Convert key value list to dictionary for easier access
+        var propertiesDictionary = properties.ToDictionary(x => x.Key, x => x.Value);
+
+        // Try to find, parse and assign properties
+        if (propertiesDictionary.TryGetValue("$detailscale", out string currentDetailScale))
+        {
+            await default(ToWorld);
+            if (Float2Extensions.GetFloat2FromString(currentDetailScale, out float2 canidate))
+            {
+                currentMaterial.DetailTextureScale.Value = canidate;
+            }
+            else
+            {
+                var newScale = float.Parse(currentDetailScale, CultureInfo.InvariantCulture.NumberFormat);
+                currentMaterial.DetailTextureScale.Value = new float2(newScale, newScale);
+            }
+            await default(ToBackground);
+        }
+
+        if (propertiesDictionary.TryGetValue("$envmapmask", out string currentEnvmapmask))
+        {
+            await default(ToBackground);
+            string currentEnvmapmaskName = currentEnvmapmask.Split('/').Last();
+
+            if(Sledge2NeosVR.vtfDictionary.TryGetValue(currentEnvmapmaskName, out var tempEnvMapBitmap2D) 
+                && Sledge2NeosVR.vtfDictionary.TryGetValue(currentEnvmapmaskName, out var tempAlbedoBitmap2D) )
+            {
+                var albMap = tempAlbedoBitmap2D.Images.GetLast();
+                var envMap = tempEnvMapBitmap2D.Images.GetLast();
+                var albMapModified = albMap.GetBgra32Data();
+                var envMapModified = envMap.GetBgra32Data();
+                for (int x = 0; x < envMapModified.Length; x += 4)
+                {
+                    envMapModified[x + 3] = (byte) // A
+                        ((envMapModified[x] + // B
+                        envMapModified[x + 1] + // G
+                        envMapModified[x + 2]) / 3); // R
+
+                    envMapModified[x] = albMapModified[x]; // B
+                    envMapModified[x + 1] = albMapModified[x + 1];  // G
+                    envMapModified[x + 2] = albMapModified[x + 2]; // R
+                }
+
+                UniLog.Log("preprocessing pixels 2");
+                var finalMap = CreateSpecularByAlphaTransfer(
+                    new Bitmap2D(albMapModified, albMap.Width, albMap.Height, TextureFormat.BGRA32, false),
+                    new Bitmap2D(envMapModified, envMap.Width, envMap.Height, TextureFormat.BGRA32, false));
+
+                await default(ToWorld);
+                StaticTexture2D finalTexture = currentSlot.AttachComponent<StaticTexture2D>();
+                finalTexture.URL.Value = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(finalMap);
+                await default(ToBackground);
+                
+                await default(ToWorld);
+                currentMaterial.SpecularMap.Target = finalTexture;
+                await default(ToBackground);
+            }
+        }
+
         return currentMaterial;
     }
 
-    private void ExtractAlpha(Source fromTexture, StaticTexture2D referenceTexture, ref PBS_Specular currentMaterial, ref List<KeyValuePair<string, string>> properties)
+    private Bitmap2D CreateSpecularByAlphaTransfer(Bitmap2D albedo, Bitmap2D donorBitmap)
     {
-        switch (fromTexture)
+        // Check if they bitmaps even contain transparent
+        if (!donorBitmap.HasTransparentPixels())
         {
-            case Source.ALBEDO:
-                if (currentMaterial.AlbedoTexture == null || !currentMaterial.AlbedoTexture.Target.Asset.HasAlpha)
-                    return;
-                break;
-            case Source.NORMAL:
-                if (currentMaterial.NormalMap == null || !currentMaterial.NormalMap.Target.Asset.HasAlpha)
-                    return;
-                // Specular
-                else if (currentMaterial.SpecularMap == null)
-                {
-                    foreach (KeyValuePair<string, string> canidate in properties)
-                    {
-                        if (canidate.Key == "$normalmapalphaenvmapmask")
-                        {
-                            StaticTexture2D normalToSpecMap = referenceTexture;
-                            normalToSpecMap.ProcessPixels((color c) => new color(0f, 0f, 0f, c.a));
-                            currentMaterial.SpecularMap.Target = normalToSpecMap;
-                            break;
-                        }
-                    }
-                }
-                break;
+            UniLog.Log("no transparent pixels");
+            return albedo;
         }
-    }
-   
-    private enum Source
-    {
-        ALBEDO,
-        NORMAL,
-        SPECULAR
+
+        // Rescale donor bitmap to match albedo bitmap
+        if (albedo.Size != donorBitmap.Size) 
+        {
+            UniLog.Log("downscaling");
+            donorBitmap.GetRescaled(albedo.Size, false, false, Filtering.Lanczos3);
+        }
+
+        var albedoRaw = albedo.RawData;
+        var donorRaw = donorBitmap.RawData;
+        for (int i = 3; i < albedoRaw.Length; i += 4)
+        {
+            // Every 4th byte (alpha), set albedo alpha byte to donorbitmap byte value
+            albedoRaw[i] = donorRaw[i];
+        }
+
+        UniLog.Log("done debugging");
+
+        return albedo;
     }
 }

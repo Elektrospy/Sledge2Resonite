@@ -62,8 +62,14 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
+    <Reference Include="UnityEngine">
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\NeosVR\UnityEngine.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Extensions\Float2Extensions.cs" />
+    <Compile Include="Extensions\Float3Extensions.cs" />
+    <Compile Include="Extensions\Helpers.cs" />
     <Compile Include="Materials\LightMappedGeneric.cs" />
     <Compile Include="Materials\PBSSpecularParser.cs" />
     <Compile Include="Materials\VertexLitGenericParser.cs" />
