@@ -1,4 +1,5 @@
 ﻿using BaseX;
+using System.Globalization;
 
 public static class Float2Extensions
 {
@@ -12,12 +13,14 @@ public static class Float2Extensions
 
         if (parsed.Contains("."))
         {
-            float2 = float2.Parse(parsed);
+            UniLog.Log("has dot");
+            float2 = float2.Parse(parsed, CultureInfo.InvariantCulture);
             return true;
         }
         else
         {
-            float2 = float2.Parse(Helpers.DivideNumbersBy255(parsed));
+            UniLog.Log("has no dot");
+            float2 = float2.Parse(Helpers.DivideNumbersBy255(parsed), CultureInfo.InvariantCulture);
             return true;
         }
     }

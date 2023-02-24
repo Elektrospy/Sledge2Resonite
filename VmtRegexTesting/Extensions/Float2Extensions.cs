@@ -1,29 +1,23 @@
-﻿using System.Text.RegularExpressions;
+﻿using BaseX;
 
 public static class Float2Extensions
 {
-    public static bool GetFloat2FromString(string str, out string float2)
+    public static bool GetFloat2FromString(string str, out float2 float2)
     {
-        if (!str.Contains("[") && !str.Contains("{"))
+        if (!Helpers.ParseValveNumberString(str, out string parsed))
         {
-            float2 = string.Empty;
+            float2 = float2.Zero;
             return false;
         }
 
-        string pattern = @"\s*([\{\[])\s*|\s*([\}\]])\s*|\s+";
-        string replacement = ";";
-        string result = Regex.Replace(str, pattern, replacement);
-        // float2 parse expected string format: "[0;0]"
-
-        if (str.Contains("."))
+        if (parsed.Contains("."))
         {
-            float2 = result;
+            float2 = float2.Parse(parsed);
             return true;
         }
         else
         {
-            result = Helpers.DivideNumbersBy255(result);
-            float2 = result;
+            float2 = float2.Parse(Helpers.DivideNumbersBy255(parsed));
             return true;
         }
     }

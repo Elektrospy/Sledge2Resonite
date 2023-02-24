@@ -82,7 +82,6 @@ namespace Sledge2NeosVR
         // Data caches
         public static Dictionary<string, VtfFile> vtfDictionary = new Dictionary<string, VtfFile>();
         public static Dictionary<string, SerialisedObject> vmtDictionary = new Dictionary<string, SerialisedObject>();
-        //private static Dictionary<string, StaticTexture2D> textureDictionary = new Dictionary<string, StaticTexture2D>();
         // preset values and look up lists
         private static readonly HashSet<string> shadersWithTexturesHashSet = new HashSet<string>() {
             "LightmappedGeneric", "VertexLitGeneric", "UnlitGeneric"
@@ -247,7 +246,7 @@ namespace Sledge2NeosVR
                                 string tempTexturePath = MergeTextureNameAndPath(currentProperty.Value, filesArr[i]);
                                 if (!string.IsNullOrEmpty(tempTexturePath)) {
                                     Msg($"got usable texture path {tempTexturePath}");
-                                    ParseInputFiles(new string[] { tempTexturePath });
+                                    await ParseInputFiles(new string[] { tempTexturePath });
                                 }
                                 else
                                 {

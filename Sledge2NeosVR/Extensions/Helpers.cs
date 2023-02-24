@@ -28,19 +28,12 @@ public static class Helpers
 
     public static bool ParseValveNumberString(string str, out string parsed)
     {
-        //if (!((str.Contains("[") || str.Contains("]")) ||
-        //      (str.Contains("{") || str.Contains("}"))))
-        //{
-        //    parsed = string.Empty;
-        //    return false;
-        //}
-
         str = str.Replace("{", "[");
         str = str.Replace("}", "]");
         str = str.Trim();
 
-        const string magic1 = "((?<=([[]))[ ]*)|([ ]*(?=([]])))"; //matches all spaces behind [ or { and spaces before ] or }
-        const string magic2 = "[ ]*"; //matches all spaces between numbers
+        const string magic1 = "((?<=([[]))[ ]*)|([ ]*(?=([]])))"; // matches all spaces behind [ or { and spaces before ] or }
+        const string magic2 = "[ \t]+"; // matches all spaces between numbers
         str = Regex.Replace(str, magic1, "");
         str = Regex.Replace(str, magic2, ";");
 
@@ -48,6 +41,7 @@ public static class Helpers
         if (str.Contains("."))
         {
             UniLog.Log("its a float");
+            UniLog.Log(str);
             parsed = str;
             return true;
         }
@@ -55,6 +49,7 @@ public static class Helpers
         {
             UniLog.Log("its a int");
             parsed = DivideNumbersBy255(str);
+            UniLog.Log(parsed);
             return true;
         }
     }

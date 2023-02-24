@@ -60,6 +60,11 @@ public abstract class PBSSpecularParser
         "$basetexture", "$detail", "$normalmap", "$bumpmap", "$envmapmask, $ambientoccltexture"
     };
 
+    protected readonly HashSet<char> multiValueEncloseCharHashset = new HashSet<char>()
+    {
+        '{', '}', '[', ']'
+    };
+
     public virtual async Task<PBS_Specular> ParseMaterial(List<KeyValuePair<string, string>> properties, string name)
     {
         await default(ToWorld);
@@ -93,7 +98,7 @@ public abstract class PBSSpecularParser
 
             // VTF contains mip-maps, but we only care about the last original image
             VtfImage currentVtfImage = currentVtf.Images.GetLast();
-            var newBitmap = new Bitmap2D(currentVtfImage.GetBgra32Data(), currentVtfImage.Width, currentVtfImage.Height, TextureFormat.BGRA32, false);
+            var newBitmap = new Bitmap2D(currentVtfImage.GetBgra32Data(), currentVtfImage.Width, currentVtfImage.Height, TextureFormat.BGRA32, false, false);
             await default(ToWorld);
             StaticTexture2D currentTexture2D = currentSlot.AttachComponent<StaticTexture2D>();
             currentTexture2D.URL.Value = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(newBitmap);
@@ -189,38 +194,98 @@ public abstract class PBSSpecularParser
 
                     break;
                 case "$envmaptint":
-                    tint = new float3(0.4f, 0.4f, 0.4f);
-                    //if (Float3Extensions.GetFloat3FromString(currentProperty.Value, out float3 val))
-                    //{
-                    //    UniLog.Log("Parsed float3 with " + val);
-                    //    tint = val;
-                    //}
-                    //else
-                    //{
-                    //    UniLog.Log("Failed to parse float3 with " + val);
-                    //    tint = float3.Zero;
-                    //}
+                    //tint = new float3(0.4f, 0.4f, 0.4f); // just for testing
+                    UniLog.Log($"specular color tint: {currentProperty.Value}");
+                    if (Float3Extensions.GetFloat3FromString(currentProperty.Value, out float3 val))
+                    {
+                        UniLog.Log("Parsed float3 with " + val);
+                        tint = val;
+                        await default(ToWorld);
+                        currentMaterial.SpecularColor.Value = new color(new float4(val.x, val.y, val.z, 1));
+                        await default(ToBackground);
+                    }
+                    else
+                    {
+                        UniLog.Log("Failed to parse float3 with " + val);
+                        tint = float3.Zero;
+                    }
                     break;
             }
         }
 
         // Convert key value list to dictionary for easier access
-        var propertiesDictionary = properties.ToDictionary(x => x.Key, x => x.Value);
-
-        // Try to find, parse and assign properties
-        if (propertiesDictionary.TryGetValue("$detailscale", out string currentDetailScale))
+        var propertiesDictionary = properties.Distinct().ToDictionary((keyItem) => keyItem.Key, (valueItem) => valueItem.Value);
+        UniLog.Log("Properties dictionary:");
+        foreach (var value in propertiesDictionary)
         {
-            await default(ToWorld);
-            if (Float2Extensions.GetFloat2FromString(currentDetailScale, out float2 canidate))
+            UniLog.Log($"key: {value.Key}, value: {value.Value}");
+        }
+
+        if (propertiesDictionary.TryGetValue("$color", out string currentAlbedoTint))
+        {
+            UniLog.Log("albedo color tint: " + currentAlbedoTint);
+            if (Float3Extensions.GetFloat3FromString(currentAlbedoTint, out float3 val))
             {
-                currentMaterial.DetailTextureScale.Value = canidate;
+                UniLog.Log("Parsed float3 with " + val);
+                await default(ToWorld);
+                currentMaterial.AlbedoColor.Value = new color(new float4(val.x, val.y, val.z, 1));
+                await default(ToBackground);
             }
             else
             {
-                var newScale = float.Parse(currentDetailScale, CultureInfo.InvariantCulture.NumberFormat);
-                currentMaterial.DetailTextureScale.Value = new float2(newScale, newScale);
+                UniLog.Log("Failed to parse float3 with " + val);
             }
+        }
+
+        if (propertiesDictionary.TryGetValue("$envmaptint", out string currentSpecularTint))
+        {
+            UniLog.Log("specular color tint: " + currentSpecularTint);
+            if (Float3Extensions.GetFloat3FromString(currentSpecularTint, out float3 val))
+            {
+                UniLog.Log("Parsed float3 with " + val);
+                await default(ToWorld);
+                currentMaterial.SpecularColor.Value = new color(new float4(val.x, val.y, val.z, 1));
+                await default(ToBackground);
+            }
+            else
+            {
+                UniLog.Log("Failed to parse float3 with " + val);
+            }
+        }
+
+        if (propertiesDictionary.TryGetValue("$detailscale", out string currentDetailScale))
+        {
+            UniLog.Log("got detail texture scale: " + currentDetailScale);
+            await default(ToWorld);
+
+            if(multiValueEncloseCharHashset.Any(currentDetailScale.Contains))
+            {
+                if (Float2Extensions.GetFloat2FromString(currentDetailScale, out float2 canidate))
+                {
+                    currentMaterial.DetailTextureScale.Value = canidate;
+                }
+            }
+            else
+            {
+                if (float.TryParse(currentDetailScale, NumberStyles.Number, CultureInfo.InvariantCulture, out float parsed))
+                {
+                    currentMaterial.DetailTextureScale.Value = new float2(parsed, parsed);
+                }
+                else
+                {
+                    UniLog.Log("Failed to parse value with " + currentDetailScale);
+                }
+            }
+
             await default(ToBackground);
+        }
+        else
+        {
+            UniLog.Log("Could not find $detailscale key in material");
+            foreach (var value in propertiesDictionary)
+            {
+                UniLog.Log(value.Value);
+            }
         }
 
         if (propertiesDictionary.TryGetValue("$envmapmask", out string currentEnvmapmask))
@@ -228,8 +293,8 @@ public abstract class PBSSpecularParser
             await default(ToBackground);
             string currentEnvmapmaskName = currentEnvmapmask.Split('/').Last();
 
-            if(Sledge2NeosVR.vtfDictionary.TryGetValue(currentEnvmapmaskName, out var tempEnvMapBitmap2D) 
-                && Sledge2NeosVR.vtfDictionary.TryGetValue(currentEnvmapmaskName, out var tempAlbedoBitmap2D) )
+            if (Sledge2NeosVR.vtfDictionary.TryGetValue(currentEnvmapmaskName, out var tempEnvMapBitmap2D) && 
+                Sledge2NeosVR.vtfDictionary.TryGetValue(currentEnvmapmaskName, out var tempAlbedoBitmap2D))
             {
                 var albMap = tempAlbedoBitmap2D.Images.GetLast();
                 var envMap = tempEnvMapBitmap2D.Images.GetLast();
@@ -249,8 +314,8 @@ public abstract class PBSSpecularParser
 
                 UniLog.Log("preprocessing pixels 2");
                 var finalMap = CreateSpecularByAlphaTransfer(
-                    new Bitmap2D(albMapModified, albMap.Width, albMap.Height, TextureFormat.BGRA32, false),
-                    new Bitmap2D(envMapModified, envMap.Width, envMap.Height, TextureFormat.BGRA32, false));
+                    new Bitmap2D(albMapModified, albMap.Width, albMap.Height, TextureFormat.BGRA32, false, false),
+                    new Bitmap2D(envMapModified, envMap.Width, envMap.Height, TextureFormat.BGRA32, false, false));
 
                 await default(ToWorld);
                 StaticTexture2D finalTexture = currentSlot.AttachComponent<StaticTexture2D>();
@@ -266,28 +331,35 @@ public abstract class PBSSpecularParser
         return currentMaterial;
     }
 
-    private Bitmap2D CreateSpecularByAlphaTransfer(Bitmap2D albedo, Bitmap2D donorBitmap)
+    private Bitmap2D CreateSpecularByAlphaTransfer(Bitmap2D albedo, Bitmap2D donor)
     {
         // Check if they bitmaps even contain transparent
-        if (!donorBitmap.HasTransparentPixels())
+        if (!donor.HasTransparentPixels())
         {
             UniLog.Log("no transparent pixels");
             return albedo;
         }
 
         // Rescale donor bitmap to match albedo bitmap
-        if (albedo.Size != donorBitmap.Size) 
+        if (albedo.Size != donor.Size) 
         {
             UniLog.Log("downscaling");
-            donorBitmap.GetRescaled(albedo.Size, false, false, Filtering.Lanczos3);
+            donor = donor.GetRescaled(albedo.Size, false, false, Filtering.Lanczos3);
         }
 
-        var albedoRaw = albedo.RawData;
-        var donorRaw = donorBitmap.RawData;
-        for (int i = 3; i < albedoRaw.Length; i += 4)
+        for (int x = 0; x < albedo.Size.x; x++)
         {
-            // Every 4th byte (alpha), set albedo alpha byte to donorbitmap byte value
-            albedoRaw[i] = donorRaw[i];
+            for (int y = 0; y < albedo.Size.y; y++)
+            {
+                var originalPixel = albedo.GetPixel(x, y);
+                var donorPixel = donor.GetPixel(x, y);
+                albedo.SetPixel(x, y,
+                    new color(
+                        originalPixel.b,
+                        originalPixel.g,
+                        originalPixel.r,
+                        donorPixel.a));
+            }
         }
 
         UniLog.Log("done debugging");

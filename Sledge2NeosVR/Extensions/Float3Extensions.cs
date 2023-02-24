@@ -1,4 +1,5 @@
 ﻿using BaseX;
+using System.Globalization;
 
 public static class Float3Extensions
 {
@@ -12,7 +13,7 @@ public static class Float3Extensions
         }
 
         UniLog.Log("parsed with " + parsed);
-        float3 = float3.Parse(parsed);
+        float3 = float3.Parse(parsed, CultureInfo.InvariantCulture);
         return true;
     }
 }
