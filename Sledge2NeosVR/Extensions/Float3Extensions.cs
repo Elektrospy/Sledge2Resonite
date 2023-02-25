@@ -7,12 +7,10 @@ public static class Float3Extensions
     {
         if (!Helpers.ParseValveNumberString(str, out string parsed))
         {
-            UniLog.Log("failed to parse " + str);
             float3 = float3.Zero;
             return false;
         }
 
-        UniLog.Log("parsed with " + parsed);
         float3 = float3.Parse(parsed, CultureInfo.InvariantCulture);
         return true;
     }

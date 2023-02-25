@@ -31,25 +31,22 @@ public static class Helpers
         str = str.Replace("{", "[");
         str = str.Replace("}", "]");
         str = str.Trim();
-
-        const string magic1 = "((?<=([[]))[ ]*)|([ ]*(?=([]])))"; // matches all spaces behind [ or { and spaces before ] or }
-        const string magic2 = "[ \t]+"; // matches all spaces between numbers
+        // matches all spaces behind [ or { and spaces before ] or }
+        const string magic1 = "((?<=([[]))[ ]*)|([ ]*(?=([]])))";
+        // matches all spaces between numbers
+        const string magic2 = "[ \t]+";
         str = Regex.Replace(str, magic1, "");
         str = Regex.Replace(str, magic2, ";");
 
         // float3 parse expected string format: "[0;0;0]"
         if (str.Contains("."))
         {
-            UniLog.Log("its a float");
-            UniLog.Log(str);
             parsed = str;
             return true;
         }
         else
         {
-            UniLog.Log("its a int");
             parsed = DivideNumbersBy255(str);
-            UniLog.Log(parsed);
             return true;
         }
     }
