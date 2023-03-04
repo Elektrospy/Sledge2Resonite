@@ -3,7 +3,7 @@ using Sledge2NeosVR;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-// var text = File.ReadAllText(@"Material.txt");
+var text = File.ReadAllText(@"Material.txt");
 // VMTPreprocessor pro = new VMTPreprocessor();
 // pro.ParseVmt(text, out string result);
 
