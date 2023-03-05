@@ -89,7 +89,7 @@ namespace Sledge2NeosVR
 
         protected static readonly HashSet<string> propertyTextureNamesHashSet = new HashSet<string>()
         {
-            "$basetexture", "$detail", "$normalmap", "$bumpmap", "$envmapmask"
+            "$basetexture", "$detail", "$normalmap", "$bumpmap", "$envmapmask", "$selfillumtexture", "$selfillummask"
         };
         private static async Task ProcessSledgeImport(IEnumerable<string> inputFiles, World world)
         {
@@ -374,6 +374,91 @@ namespace Sledge2NeosVR
             // make the quad grabbable
             currentSlot.AttachComponent<Grabbable>().Scalable.Value = true;
             Msg("creating texture (hopefully) succesfull!");
+        }
+
+        private static async Task NewLUTImport(string path, Slot targetSlot)
+        {
+            await new ToBackground();
+            var bitmap2D = Bitmap2D.Load(path, false, false);
+            if (bitmap2D.Size.x != 32 || bitmap2D.Size.y != 1024) return; // Is this a valid source texture?
+
+            /* ---
+             * |1|
+             * ---
+             * |2|
+             * ---
+             * |3|
+             * ---
+             * ...
+             * 
+             * So, we'll keep a running "z" offset for what square we are in 
+             * (z being how far "down we are", and there will always be 32 squares)
+             * 
+             * 1)
+             * ---   ---   ---   ---   ---   ---   ---   ---   ---
+             * |1|   |1|   |1|   |1|   |1|   |1|   |1|   |1|   |1|
+             * *--   -*-   --*   ---   ---   ---   ---   ---   ---
+             * |2|...|2|...|2|...|2|...|2|...|2|...|2|...|2|...|2|
+             * ---   ---   ---   *--   -*-   -*-   ---   ---   ---
+             * |3|   |3|   |3|   |3|   |3|   |3|   |3|   |3|   |3|
+             * ---   ---   ---   ---   ---   ---   -*-   -*-   --*
+             * 
+             * 2)
+             * ---   ---   ---   ---   ---   ---   ---   ---   ---
+             * *1|   |*|   |*|   |1|   |1|   |1|   |1|   |1|   |1|
+             * ---   ---   ---   ---   ---   ---   ---   ---   ---
+             * |2|...|2|...|2|...*2|...|*|...|2*...|2|...|2|...|2|
+             * ---   ---   ---   ---   ---   ---   ---   ---   ---
+             * |3|   |3|   |3|   |3|   |3|   |3|   *3|   |*|   |3*
+             * ---   ---   ---   ---   ---   ---   ---   ---   ---
+             * 
+             * 3)
+             * *--   -*-   -*-   ---   ---   ---   ---   ---   ---
+             * |1|   |1|   |1|   |1|   |1|   |1|   |1|   |1|   |1|
+             * ---   ---   ---   -*-   -*-   -*-   ---   ---   ---
+             * |2|...|2|...|2|...|2|...|2|...|2|...|2|...|2|...|2|
+             * ---   ---   ---   ---   ---   ---   -*-   -*-   -*-
+             * |3|   |3|   |3|   |3|   |3|   |3|   |3|   |3|   |3|
+             * ---   ---   ---   ---   ---   ---   ---   ---   ---
+             * 
+             * (Note pixels do not overlap!)
+             */
+
+            Uri uri;
+            var texture = new Bitmap3D(32, 32, 32, CodeX.TextureFormat.RGBA32, false);
+
+            // Need prefix addition in loops?
+            for (int z1 = 0; z1 < 32; z1++)
+            {
+                for (int y1 = 0; y1 < 32; y1++)
+                {
+                    // The starting y position for each "z1-th" row (Hint, starting pixel is 1024-32 or 992)
+                    int y2 = 992 - ((y1 * 32) + z1);
+
+                    for (int x1 = 0; x1 < 32; x1++)
+                    {
+                        int x2 = y2 % 32;
+                        int z2 = y2 / 32;
+
+                        color pixel = bitmap2D.GetPixel(x1, y2);
+                        texture.SetPixel(x2, y1, z2, in pixel);
+                        // texture.SetPixel(x1, y1, z1, in pixel);
+                    }
+                }
+            }
+
+            uri = await targetSlot.Engine.LocalDB.SaveAssetAsync(texture).ConfigureAwait(false);
+
+            await new ToWorld();
+
+            var lutTex = targetSlot.AttachComponent<StaticTexture3D>();
+            lutTex.URL.Value = uri;
+
+            var lutMat = targetSlot.AttachComponent<LUT_Material>();
+            lutMat.LUT.Target = lutTex;
+
+            MaterialOrb.ConstructMaterialOrb(lutMat, targetSlot);
+            lutMat.GetGizmo();
         }
     }
 }

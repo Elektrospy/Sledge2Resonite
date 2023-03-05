@@ -2,7 +2,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-public static class Helpers
+public static class Utils
 {
     public static string DivideNumbersBy255(string input)
     {
@@ -31,10 +31,12 @@ public static class Helpers
         str = str.Replace("{", "[");
         str = str.Replace("}", "]");
         str = str.Trim();
+
         // matches all spaces behind [ or { and spaces before ] or }
         const string magic1 = "((?<=([[]))[ ]*)|([ ]*(?=([]])))";
         // matches all spaces between numbers
         const string magic2 = "[ \t]+";
+
         str = Regex.Replace(str, magic1, "");
         str = Regex.Replace(str, magic2, ";");
 

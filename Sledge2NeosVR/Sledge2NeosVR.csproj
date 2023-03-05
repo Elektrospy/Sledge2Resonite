@@ -69,7 +69,7 @@
   <ItemGroup>
     <Compile Include="Extensions\Float2Extensions.cs" />
     <Compile Include="Extensions\Float3Extensions.cs" />
-    <Compile Include="Extensions\Helpers.cs" />
+    <Compile Include="Extensions\Utils.cs" />
     <Compile Include="Materials\LightMappedGeneric.cs" />
     <Compile Include="Materials\PBSSpecularParser.cs" />
     <Compile Include="Materials\VertexLitGenericParser.cs" />

@@ -30,6 +30,9 @@ public class VMTPreprocessor : Preprocessor
             parsedFile = parsedFile.Replace("}\"\"", "}\"");
             // make all paths us \ instead of /
             parsedFile = parsedFile.Replace("\\", "/");
+            // remove all whitespace lines
+           parsedFile = sufficReplaceWhitespacesMulti.Replace(parsedFile, string.Empty);
+
             // remove the quotation marks from the first line
             // UniLog.Log("remove the quotation marks from the first line");
             string firstline = parsedFile.Substring(0, parsedFile.IndexOf(Environment.NewLine));

@@ -5,7 +5,7 @@ public static class Float2Extensions
 {
     public static bool GetFloat2FromString(string str, out float2 float2)
     {
-        if (!Helpers.ParseValveNumberString(str, out string parsed))
+        if (!Utils.ParseValveNumberString(str, out string parsed))
         {
             float2 = float2.Zero;
             return false;
@@ -18,7 +18,7 @@ public static class Float2Extensions
         }
         else
         {
-            float2 = float2.Parse(Helpers.DivideNumbersBy255(parsed), CultureInfo.InvariantCulture);
+            float2 = float2.Parse(Utils.DivideNumbersBy255(parsed), CultureInfo.InvariantCulture);
             return true;
         }
     }
