@@ -2,7 +2,6 @@
 using CodeX;
 using FrooxEngine;
 using Sledge.Formats.Texture.Vtf;
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;

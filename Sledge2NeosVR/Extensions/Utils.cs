@@ -1,10 +1,11 @@
 ﻿using BaseX;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using System;
 
 public static class Utils
 {
-    public static string DivideNumbersBy255(string input)
+    internal static string DivideNumbersBy255(string input)
     {
         // Create a regular expression pattern to match numbers in the input string
         string pattern = @"-?\d+\.?\d*";
@@ -26,7 +27,7 @@ public static class Utils
         return input;
     }
 
-    public static bool ParseValveNumberString(string str, out string parsed)
+    internal static bool ParseValveNumberString(string str, out string parsed)
     {
         str = str.Replace("{", "[");
         str = str.Replace("}", "]");
@@ -50,6 +51,33 @@ public static class Utils
         {
             parsed = DivideNumbersBy255(str);
             return true;
+        }
+    }
+
+    internal static string MergeTextureNameAndPath(string textureName, string materialPath)
+    {
+        if (string.IsNullOrEmpty(textureName) || string.IsNullOrEmpty(materialPath))
+        {
+            return string.Empty;
+        }
+
+        // example paths for merging
+        // texture path from vmt:    "models\props_blackmesa\lamppost03_grey_on"
+        // material path:   "C:\Steam\steamapps\common\Black Mesa\bms\materials\models\props_blackmesa"
+        // flip "/" to "\" for texture path
+        textureName = textureName.Replace("/", "\\");
+        const string baseFolderName = "\\materials\\";
+        try
+        {
+            // D:\Steam\steamapps\common\Black Mesa\bmsconsole\background01.vtf
+            materialPath = materialPath.Substring(0, materialPath.LastIndexOf(baseFolderName));
+            string resultTexturePath = materialPath + baseFolderName + textureName + ".vtf";
+            return resultTexturePath;
+        }
+        catch (Exception ex)
+        {
+            UniLog.Error($"Substring error in MergeTextureNameAndPath: {ex}");
+            return string.Empty;
         }
     }
 }
