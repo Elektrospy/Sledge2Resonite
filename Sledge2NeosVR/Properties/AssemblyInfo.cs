@@ -4,12 +4,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("AssetImportAPI")]
-[assembly: AssemblyDescription("Exposes NeosVR's asset importing system for curious developers.")]
+[assembly: AssemblyTitle("Sledge2NeosVR")]
+[assembly: AssemblyDescription("Imports Valve Source Engine Materials and Textures")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Hiatus Labs")]
-[assembly: AssemblyProduct("AssetImportAPI")]
-[assembly: AssemblyCopyright("Copyright ©  2022")]
+[assembly: AssemblyCompany("The Science Team")]
+[assembly: AssemblyProduct("Sledge2NeosVR")]
+[assembly: AssemblyCopyright("Copyright ©  2023")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
