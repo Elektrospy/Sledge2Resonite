@@ -76,7 +76,7 @@ public static class Utils
         }
         catch (Exception ex)
         {
-            UniLog.Error($"Substring error in MergeTextureNameAndPath: {ex}");
+            UniLog.Error($"Substring error in MergeTextureNameAndPath: {ex.Message}");
             return string.Empty;
         }
     }

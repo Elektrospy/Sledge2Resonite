@@ -33,7 +33,7 @@ public class VMTPreprocessor : Preprocessor
         }
         catch (Exception ex)
         {
-            UniLog.Error($"ParseVmt failed with error: {ex}");    
+            UniLog.Error($"ParseVmt failed with error: {ex.Message}");    
             parsedFile = string.Empty;
         }
 
