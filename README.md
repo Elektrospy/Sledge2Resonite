@@ -27,3 +27,8 @@ Thanks go to these wonderful people
 </table>
 <!-- markdownlint-restore -->
 <!-- prettier-ignore-end -->
+
+### Borrowed Code
+* ssbumpToNormal-Win
+	* SSBumpmap to NormalMap conversion
+	* https://github.com/rob5300/ssbumpToNormal-Win

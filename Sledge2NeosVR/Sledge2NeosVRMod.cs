@@ -44,6 +44,9 @@ namespace Sledge2NeosVR
         internal static ModConfigurationKey<int> importTextureRow = new("textureRows", "Import Textures number of rows", () => 5);
 
         [AutoRegisterConfigKey]
+        internal static ModConfigurationKey<bool> SSBumpAutoConvert = new("SSBump auto convert", "Auto convert SSBump to NormalMap", () => true);
+
+        [AutoRegisterConfigKey]
         internal static ModConfigurationKey<bool> importMaterial = new("importMaterial", "Import Materials", () => true);
 
         [AutoRegisterConfigKey]
@@ -292,6 +295,9 @@ namespace Sledge2NeosVR
                 return;
             }
 
+            Msg($"Current material shader: {currentSerialisedObject.Name}");
+            // TODO: add more material shader parsers
+
             await default(ToBackground);
             VertexLitGenericParser vertexLitGenericParser = new VertexLitGenericParser();
             await vertexLitGenericParser.ParseMaterial(currentSerialisedObject.Properties, currentVmtName);
@@ -339,6 +345,13 @@ namespace Sledge2NeosVR
                 // so we need to invert the green channel
                 // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
                 currentTexture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
+            }
+
+            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Ssbump) && config.GetValue(Sledge2NeosVR.SSBumpAutoConvert))
+            {
+                currentTexture2D.IsNormalMap.Value = true;
+
+                 Utils.SSBumpToNormal(currentTexture2D);
             }
 
             ImageImporter.SetupTextureProxyComponents(

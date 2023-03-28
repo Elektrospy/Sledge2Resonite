@@ -2,10 +2,13 @@
 using CodeX;
 using FrooxEngine;
 using Sledge.Formats.Texture.Vtf;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using UnityEngine;
+using TextureFormat = CodeX.TextureFormat;
 
 namespace Sledge2NeosVR;
 
@@ -37,6 +40,7 @@ namespace Sledge2NeosVR;
 /// "$envmapsaturation" "[1 1 1]" -> Controls the color saturation of the reflection. 0 is greyscale, while 1 is natural saturation.
 /// "$basealphaenvmapmask" "1" -> Albedo contains specular map in alpha channel, Alpha channels embedded in $basetexture work in reverse.
 /// "$normalmapalphaenvmapmask" "1" -> The normal map contains a specular map in its alpha channel
+/// "$normalalphaenvmapmask" "1" -> common typo of the same setting
 /// "$envmapmaskintintmasktexture" "1" -> Use the red channel of the $tintmasktexture as the specular mask.
 /// --- Emission ---
 /// "$selfillum" "1" -> Material is emissive, use albedo texture with blacked out background if "$selfillummask" is not set
@@ -60,6 +64,10 @@ namespace Sledge2NeosVR;
 /// using regions :(
 /// </remarks>
 /// <see cref="https://developer.valvesoftware.com/wiki/Category:List_of_Shader_Parameters"/>
+/// 
+
+// TODO: fails specular creation on securitystation_bits.vmt -> inside normalmap
+
 public abstract class PBSSpecularParser
 {
     protected readonly HashSet<string> propertyTextureNamesHashSet = new HashSet<string>()
@@ -140,6 +148,12 @@ public abstract class PBSSpecularParser
                     // So we need to invert the green channel
                     // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
                     normalmapBitmap = newBitmap;
+
+                    if (Sledge2NeosVR.config.GetValue(Sledge2NeosVR.SSBumpAutoConvert) && currentProperty.Key == "$bumpmap")
+                    {
+                        Utils.SSBumpToNormal(currentTexture2D);
+                    }
+
                     currentTexture2D.IsNormalMap.Value = true;
                     currentMaterial.NormalMap.Target = currentTexture2D;
                     break;
@@ -164,7 +178,7 @@ public abstract class PBSSpecularParser
         return currentMaterial;
     }
 
-     private async Task<PBS_Specular> CreateSpecularMapFromAlbedoMap(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary, Slot currentSlot)
+    private async Task<PBS_Specular> CreateSpecularMapFromAlbedoMap(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary, Slot currentSlot)
     {
         // Handle specular map in albedo alpha channel
         if (propertiesDictionary.TryGetValue("$basealphaenvmapmask", out string hasAblbedoSpecular) &&
@@ -223,7 +237,7 @@ public abstract class PBSSpecularParser
                         envMapModified[x + 2]) / 3); // R
 
                     envMapModified[x] = albMapModified[x]; // B
-                    envMapModified[x + 1] = albMapModified[x + 1];  // G
+                    envMapModified[x + 1] = albMapModified[x + 1]; // G
                     envMapModified[x + 2] = albMapModified[x + 2]; // R
                 }
 
@@ -466,7 +480,7 @@ public abstract class PBSSpecularParser
         {
             UniLog.Error("Failed to parse float3 with " + tint);
         }
-  
+
         return currentMaterial;
     }
 
@@ -512,7 +526,7 @@ public abstract class PBSSpecularParser
         }
 
         // Rescale donor bitmap to match albedo bitmap
-        if (albedo.Size != donor.Size) 
+        if (albedo.Size != donor.Size)
         {
             // UniLog.Log("Texture size mismatch, rescaling");
             donor = donor.GetRescaled(albedo.Size, false, false, Filtering.Lanczos3);
@@ -536,4 +550,5 @@ public abstract class PBSSpecularParser
 
         return albedo;
     }
+
 }
