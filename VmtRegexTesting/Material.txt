@@ -1,19 +1,29 @@
-﻿"VertexLitGeneric"
+﻿"LightmappedGeneric"
 {
-	"$basetexture" 								"models/props_xen/interloper/holograms/conveyor_shields_across"
-	"$translucent" 								"1"
-	"$additive" 								"1"
-	"$nocull"									"1"
-	
-	"$model"									"1"	
-	
-	"$emissiveBlendEnabled" 					"1"
-	"$emissiveBlendTint" 						"{40 180 200}"
- 	"$emissiveBlendTexture" 					"models\props_xen\interloper\holograms\noise01"
-	"$emissiveBlendBaseTexture" 				"models\props_xen\interloper\holograms\conveyor_shields_across"
-	"$emissiveBlendFlowTexture" 				"models\props_xen\interloper\holograms\down_flow" 				//Can use a flow mask that scrolls to create disruptive patterns. Use white for just basic glow.
-	"$emissiveBlendStrength" 					"1" 															//Strength of glow. Can be controlled via proxy for variable glow.
-	"$emissiveBlendScrollVector" 				"[0.05 0.05]" 
-	"$sheenpassenabled" 						"1"
-}
+	"$basetexture" "bms/conveyor_beltface"
+	"$bumpmap" "bms/conveyor_beltface_normal"
+	"$nodecal"	"1"
 
+	"$phong" "1"
+	"$phongexponent" 5 // just a random comment for testing
+	"$phongboost"	"2"
+	"$phongfresnelranges"	"[1 2 4]"
+
+	"$surfaceprop" "rubber"
+	"%keywords" "bms"
+	"Proxies"
+	{
+		"TextureScroll"
+		{
+			"texturescrollvar" 						"$baseTextureTransform" // just a random comment for testing
+			"texturescrollrate" 0.98
+			"texturescrollangle" -90.00
+		}
+		"TextureScroll"
+		{
+			"texturescrollvar" "$bumptransform"
+			"texturescrollrate" 0.98
+			"texturescrollangle" -90.00
+		}
+	}
+}

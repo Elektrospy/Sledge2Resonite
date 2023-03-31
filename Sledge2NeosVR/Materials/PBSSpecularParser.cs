@@ -2,10 +2,13 @@
 using CodeX;
 using FrooxEngine;
 using Sledge.Formats.Texture.Vtf;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using UnityEngine;
+using TextureFormat = CodeX.TextureFormat;
 
 namespace Sledge2NeosVR;
 
@@ -37,6 +40,7 @@ namespace Sledge2NeosVR;
 /// "$envmapsaturation" "[1 1 1]" -> Controls the color saturation of the reflection. 0 is greyscale, while 1 is natural saturation.
 /// "$basealphaenvmapmask" "1" -> Albedo contains specular map in alpha channel, Alpha channels embedded in $basetexture work in reverse.
 /// "$normalmapalphaenvmapmask" "1" -> The normal map contains a specular map in its alpha channel
+/// "$normalalphaenvmapmask" "1" -> common typo of the same setting
 /// "$envmapmaskintintmasktexture" "1" -> Use the red channel of the $tintmasktexture as the specular mask.
 /// --- Emission ---
 /// "$selfillum" "1" -> Material is emissive, use albedo texture with blacked out background if "$selfillummask" is not set
@@ -60,6 +64,10 @@ namespace Sledge2NeosVR;
 /// using regions :(
 /// </remarks>
 /// <see cref="https://developer.valvesoftware.com/wiki/Category:List_of_Shader_Parameters"/>
+/// 
+
+// TODO: fails specular creation on securitystation_bits.vmt -> inside normalmap
+
 public abstract class PBSSpecularParser
 {
     protected readonly HashSet<string> propertyTextureNamesHashSet = new HashSet<string>()
@@ -140,6 +148,12 @@ public abstract class PBSSpecularParser
                     // So we need to invert the green channel
                     // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
                     normalmapBitmap = newBitmap;
+
+                    if (Sledge2NeosVR.config.GetValue(Sledge2NeosVR.SSBumpAutoConvert) && currentProperty.Key == "$bumpmap")
+                    {
+                        Utils.SSBumpToNormal(currentTexture2D);
+                    }
+
                     currentTexture2D.IsNormalMap.Value = true;
                     currentMaterial.NormalMap.Target = currentTexture2D;
                     break;
@@ -156,8 +170,9 @@ public abstract class PBSSpecularParser
         currentMaterial = await CreateSpecularMapFromAlbedoMap(currentMaterial, propertiesDictionary, currentSlot);
         currentMaterial = await CreateSpecularFromNormalMap(currentMaterial, propertiesDictionary, currentSlot, normalmapBitmap);
         currentMaterial = await CreateEmissionMap(currentMaterial, propertiesDictionary, currentSlot);
-        currentMaterial = await SetAlbedoTint(currentMaterial, propertiesDictionary);
-        currentMaterial = await SetSpecularTint(currentMaterial, propertiesDictionary);
+        currentMaterial = await SetAlbedoColor(currentMaterial, propertiesDictionary);
+        currentMaterial = await SetSpecularColor(currentMaterial, propertiesDictionary);
+        currentMaterial = await SetSpecularMapTint(currentMaterial, propertiesDictionary, currentSlot);
         currentMaterial = await SetTextureTransforms(currentMaterial, propertiesDictionary);
 
         return currentMaterial;
@@ -222,7 +237,7 @@ public abstract class PBSSpecularParser
                         envMapModified[x + 2]) / 3); // R
 
                     envMapModified[x] = albMapModified[x]; // B
-                    envMapModified[x + 1] = albMapModified[x + 1];  // G
+                    envMapModified[x + 1] = albMapModified[x + 1]; // G
                     envMapModified[x + 2] = albMapModified[x + 2]; // R
                 }
 
@@ -346,33 +361,14 @@ public abstract class PBSSpecularParser
                 await default(ToBackground);
 
                 // set emission color
-                if (propertiesDictionary.TryGetValue("$selfillumtint", out string currentSelfIllumTint))
-                {
-                    UniLog.Log("emission color tint: " + currentSelfIllumTint);
-                    if (Float3Extensions.GetFloat3FromString(currentSelfIllumTint, out float3 val))
-                    {
-                        await default(ToWorld);
-                        currentMaterial.EmissiveColor.Value = new color(new float4(val.x, val.y, val.z, 1));
-                        await default(ToBackground);
-                    }
-                    else
-                    {
-                        UniLog.Error("Failed to parse float3 with " + val);
-                    }
-                }
-                else
-                {
-                    await default(ToWorld);
-                    currentMaterial.EmissiveColor.Value = new color(new float4(1, 1, 1, 1));
-                    await default(ToBackground);
-                }
+                await SetEmissionColor(currentMaterial, propertiesDictionary);
             }
         }
 
         return currentMaterial;
     }
 
-    private async Task<PBS_Specular> SetAlbedoTint(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary)
+    private async Task<PBS_Specular> SetAlbedoColor(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary)
     {
         if (propertiesDictionary.TryGetValue("$color", out string currentAlbedoTint))
         {
@@ -387,7 +383,33 @@ public abstract class PBSSpecularParser
         return currentMaterial;
     }
 
-    private async Task<PBS_Specular> SetSpecularTint(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary)
+    private async Task<PBS_Specular> SetEmissionColor(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary)
+    {
+        if (propertiesDictionary.TryGetValue("$selfillumtint", out string currentSelfIllumTint))
+        {
+            UniLog.Log("emission color tint: " + currentSelfIllumTint);
+            if (Float3Extensions.GetFloat3FromString(currentSelfIllumTint, out float3 val))
+            {
+                await default(ToWorld);
+                currentMaterial.EmissiveColor.Value = new color(new float4(val.x, val.y, val.z, 1));
+                await default(ToBackground);
+            }
+            else
+            {
+                UniLog.Error("Failed to parse float3 with " + val);
+            }
+        }
+        else
+        {
+            await default(ToWorld);
+            currentMaterial.EmissiveColor.Value = new color(new float4(1, 1, 1, 1));
+            await default(ToBackground);
+        }
+
+        return currentMaterial;
+    }
+
+    private async Task<PBS_Specular> SetSpecularColor(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary)
     {
         if (propertiesDictionary.TryGetValue("$envmaptint", out string currentSpecularTint))
         {
@@ -402,6 +424,61 @@ public abstract class PBSSpecularParser
             {
                 UniLog.Error("Failed to parse float3 with " + tint);
             }
+        }
+
+        return currentMaterial;
+    }
+
+    // TODO Test
+    private async Task<PBS_Specular> SetSpecularMapTint(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary, Slot currentSlot)
+    {
+        if (!Sledge2NeosVR.config.GetValue(Sledge2NeosVR.tintSpecular))
+        {
+            return currentMaterial;
+        }
+
+        color tint = color.White;
+        if (propertiesDictionary.TryGetValue("$envmaptint", out string currentSpecularTint))
+        {
+            UniLog.Log("Specular color tint: " + currentSpecularTint);
+            if (Float3Extensions.GetFloat3FromString(currentSpecularTint, out float3 hue))
+            {
+                tint = new color(new float4(hue.x, hue.y, hue.z, 1));
+            }
+            else if (currentMaterial.SpecularColor.Value != color.White)
+            {
+                tint = currentMaterial.SpecularColor.Value;
+            }
+            else
+            {
+                UniLog.Error("Failed to parse float3 with " + tint);
+                return currentMaterial;
+            }
+        }
+        else if (Sledge2NeosVR.vtfDictionary.TryGetValue(currentSpecularTint, out var currentSpecularMapTexture))
+        {
+            // Copy texture and invert alpha channel for specular
+            var specMap = currentSpecularMapTexture.Images.GetLast();
+            var specMapRaw = specMap.GetBgra32Data();
+
+            // Create new specular bitmap from copying the normalmap alpha into the albedo alpha
+            var finalMap = new Bitmap2D(specMapRaw, specMap.Width, specMap.Height, TextureFormat.BGRA32, false);
+
+            // Wait for the world to catch up
+            await default(ToWorld);
+            StaticTexture2D finalTexture = currentSlot.AttachComponent<StaticTexture2D>();
+            await default(ToBackground);
+
+            finalTexture.ProcessPixels((color color) => color * tint);
+
+            await default(ToWorld);
+            finalTexture.URL.Value = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(finalMap);
+            currentMaterial.SpecularMap.Target = finalTexture;
+            await default(ToBackground);
+        }
+        else
+        {
+            UniLog.Error("Failed to parse float3 with " + tint);
         }
 
         return currentMaterial;
@@ -449,7 +526,7 @@ public abstract class PBSSpecularParser
         }
 
         // Rescale donor bitmap to match albedo bitmap
-        if (albedo.Size != donor.Size) 
+        if (albedo.Size != donor.Size)
         {
             // UniLog.Log("Texture size mismatch, rescaling");
             donor = donor.GetRescaled(albedo.Size, false, false, Filtering.Lanczos3);
@@ -473,4 +550,5 @@ public abstract class PBSSpecularParser
 
         return albedo;
     }
+
 }
