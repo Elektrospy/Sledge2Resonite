@@ -291,7 +291,7 @@ namespace Sledge2NeosVR
         {
             if (string.IsNullOrEmpty(currentVmtName))
             {
-                Error("Vtf name is empty!");
+                Error("Vmt name is empty!");
                 return;
             }
 

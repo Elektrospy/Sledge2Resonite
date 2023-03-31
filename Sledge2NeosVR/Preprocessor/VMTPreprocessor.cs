@@ -18,16 +18,13 @@ public class VMTPreprocessor : Preprocessor
                 return false;
             }
 
-            parsedFile = replaceCommentsMulti.Replace(input, replaceCommentsSubstitutionMulti); // works :)
-            parsedFile = suffixReplacementMulti.Replace(parsedFile, suffixReplacementSubstitutionMulti);
-            parsedFile = sufficReplaceWhitespacesMulti.Replace(parsedFile, string.Empty);
+            parsedFile = replaceComMulti.Replace(input, replaceComSubMulti); // works :)
+            parsedFile = suffixReplaceMulti.Replace(parsedFile, suffixReplaceSubMulti);
+            parsedFile = sufficReplaceWsMulti.Replace(parsedFile, string.Empty);
             parsedFile = parsedFile.Replace("\"\"{", "\"{");
             parsedFile = parsedFile.Replace("}\"\"", "}\"");
             parsedFile = parsedFile.Replace("\\", "/");
-            string firstline = parsedFile.Substring(0, parsedFile.IndexOf(Environment.NewLine));
-
-            string parsedFirstLine = firstline.Replace("\"", "");
-            parsedFile = parsedFile.Replace(firstline, parsedFirstLine);
+            parsedFile = newObjQMarkMulti.Replace(parsedFile, objQMarkReplaceSub);
 
             return true;
         }

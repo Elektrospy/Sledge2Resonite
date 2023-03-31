@@ -19,11 +19,11 @@ public class VMTPreprocessor : Preprocessor
             // UniLog.Log("Remove enclosing quotation marks from first line");
 
             // remove trailing comments
-            parsedFile = replaceCommentsMulti.Replace(input, replaceCommentsSubstitutionMulti); // works :)
+            parsedFile = replaceComMulti.Replace(input, replaceComSubMulti); // works :)
             // UniLog.Log(parsedFile);
             // UniLog.Log("add missing quotation marks");
             // add missing quotation marks
-            parsedFile = suffixReplacementMulti.Replace(parsedFile, suffixReplacementSubstitutionMulti);
+            parsedFile = suffixReplaceMulti.Replace(parsedFile, suffixReplaceSubMulti);
             // UniLog.Log(parsedFile);
             // remove double quotation marks around float values
             parsedFile = parsedFile.Replace("\"\"{", "\"{");
@@ -31,18 +31,9 @@ public class VMTPreprocessor : Preprocessor
             // make all paths us \ instead of /
             parsedFile = parsedFile.Replace("\\", "/");
             // remove all whitespace lines
-           parsedFile = sufficReplaceWhitespacesMulti.Replace(parsedFile, string.Empty);
-
-            // remove the quotation marks from the first line
-            // UniLog.Log("remove the quotation marks from the first line");
-            string firstline = parsedFile.Substring(0, parsedFile.IndexOf(Environment.NewLine));
-            // UniLog.Log(firstline);
-
-            string parsedFirstLine = firstline.Replace("\"", "");
-            // UniLog.Log(parsedFirstLine);
-
-            parsedFile = parsedFile.Replace(firstline, parsedFirstLine);
-            // UniLog.Log(parsedFile);
+            parsedFile = sufficReplaceWsMulti.Replace(parsedFile, string.Empty);
+            // clean up all object name lines
+            parsedFile = newObjQMarkMulti.Replace(parsedFile, objQMarkReplaceSub);
 
             return true;
         }
