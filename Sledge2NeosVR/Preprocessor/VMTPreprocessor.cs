@@ -24,6 +24,7 @@ public class VMTPreprocessor : Preprocessor
             parsedFile = parsedFile.Replace("\"\"{", "\"{");
             parsedFile = parsedFile.Replace("}\"\"", "}\"");
             parsedFile = parsedFile.Replace("\\", "/");
+            parsedFile = parsedFile.Replace(".vtf", "");
             parsedFile = newObjQMarkMulti.Replace(parsedFile, objQMarkReplaceSub);
 
             return true;

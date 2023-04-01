@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using File = System.IO.File;
 using FrooxEngine.Undo;
 using TextureFormat = CodeX.TextureFormat;
+using UnityEngine;
 
 namespace Sledge2NeosVR
 {
@@ -42,6 +43,9 @@ namespace Sledge2NeosVR
 
         [AutoRegisterConfigKey]
         internal static ModConfigurationKey<int> importTextureRow = new("textureRows", "Import Textures number of rows", () => 5);
+
+        [AutoRegisterConfigKey]
+        internal static ModConfigurationKey<bool> generateTextureAtlas = new("Generate frame atlas", "Auto generate atlas of multiframe textures", () => true);
 
         [AutoRegisterConfigKey]
         internal static ModConfigurationKey<bool> SSBumpAutoConvert = new("SSBump auto convert", "Auto convert SSBump to NormalMap", () => true);
@@ -120,12 +124,12 @@ namespace Sledge2NeosVR
 
                 FileInfo currentFileInfo;
                 FileStream fs;
-                try 
+                try
                 {
                     currentFileInfo = new FileInfo(filesArr[i]);
                     fs = File.Open(filesArr[i], FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"Got an exception while opening the file: {filesArr[i]} {ex.Message}");
                     // Error($"Got an exception while opening the file: {filesArr[i]} {ex.Message});
@@ -144,7 +148,7 @@ namespace Sledge2NeosVR
                                 tempVtf = vtfDictionary[currentFileName];
                             else
                                 vtfDictionary.Add(currentFileName, tempVtf);
-                        } 
+                        }
                         catch (Exception e)
                         {
                             await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"Couldn't add vtf {currentFileName}, error: {e.Message}");
@@ -161,7 +165,7 @@ namespace Sledge2NeosVR
                             currentSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Texture: " + currentFileName);
                             currentSlot.CreateSpawnUndoPoint();
                         }
-                        catch (Exception e) 
+                        catch (Exception e)
                         {
                             await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"Couldn't add Slot \"Texture: {currentFileName}\" to world, error: {e.Message}");
                             // Error($"Couldn't add Slot \"Texture: {currentFileName}\" to world, error: {e.Message}");
@@ -172,7 +176,7 @@ namespace Sledge2NeosVR
                         if (vtfCounter == 0)
                         {
                             currentSlot.PositionInFrontOfUser();
-                        } 
+                        }
                         else
                         {
                             currentSlot.PositionInFrontOfUser();
@@ -225,11 +229,11 @@ namespace Sledge2NeosVR
                             {
                                 string tempTexturePath = Utils.MergeTextureNameAndPath(currentProperty.Value, filesArr[i]);
 
-                                if (!string.IsNullOrEmpty(tempTexturePath)) 
+                                if (!string.IsNullOrEmpty(tempTexturePath))
                                     await ParseInputFiles(new string[] { tempTexturePath }, world, loadingCircle);
                                 else
                                     await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", "Texture path is empty or null!");
-                                    //Error("Texture path is empty or null!");
+                                //Error("Texture path is empty or null!");
                             }
                         }
 
@@ -238,7 +242,7 @@ namespace Sledge2NeosVR
                             await CreateMaterialOrbFromVmt(currentFileName, firstVmtObject);
                         else
                             await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"Couldn't find {currentFileName} in vmt dictionary");
-                            // Error($"Couldn't find {currentFileName} in vmt dictionary");
+                        // Error($"Couldn't find {currentFileName} in vmt dictionary");
 
                         vmtCounter++;
                         break;
@@ -311,26 +315,84 @@ namespace Sledge2NeosVR
             await default(ToWorld);
             currentSlot.PositionInFrontOfUser();
             VtfImage currentVtfImage = currentVtf.Images.GetLast();
+
             var newBitmap = new Bitmap2D(
-                currentVtfImage.GetBgra32Data(), 
-                currentVtfImage.Width, 
-                currentVtfImage.Height, 
-                TextureFormat.BGRA32, 
-                false, 
+                currentVtfImage.GetBgra32Data(),
+                currentVtfImage.Width,
+                currentVtfImage.Height,
+                TextureFormat.BGRA32,
+                false,
                 false);
+
+            if (config.GetValue(Sledge2NeosVR.generateTextureAtlas))
+            {
+                var imageList = currentVtf.Images;
+                var mipmapNumber = currentVtf.Header.mipmapCount;
+                var framesNumberRaw = imageList.Count;
+                var framesNumber = framesNumberRaw / mipmapNumber;
+                var bytesNumber = currentVtfImage.Width * currentVtfImage.Height * 4 * framesNumber;
+                byte[] fillBytes = new byte[bytesNumber];
+
+                Msg($"Generate image atlas with {framesNumber} frames");
+                var newAtlasBitmap = new Bitmap2D(
+                    fillBytes,
+                    currentVtfImage.Width * framesNumber,
+                    currentVtfImage.Height,
+                    TextureFormat.BGRA32,
+                    false,
+                    false);
+                Msg($"Generated atlas bitmap with Width: {newAtlasBitmap.Size.x} and Height: {newAtlasBitmap.Size.y}");
+
+                Msg($"Parse frames ...");
+                var frameIndexStartOffset = imageList.Count - framesNumber;
+                for (int currentFrame = frameIndexStartOffset; currentFrame < framesNumberRaw; currentFrame++)
+                {
+                    try
+                    {
+                        int currentOutputFrameIndex = currentFrame - frameIndexStartOffset;
+                        var currentFrameImage = imageList[currentFrame];
+
+                        var currentFrameBitmap = new Bitmap2D(
+                            currentFrameImage.GetBgra32Data(),
+                            currentFrameImage.Width,
+                            currentFrameImage.Height,
+                            TextureFormat.BGRA32,
+                            false,
+                            false);
+
+                        for (int currentX = 0; currentX < currentFrameBitmap.Size.x; currentX++)
+                        {
+                            var pixelOffsetX = currentVtfImage.Width * currentOutputFrameIndex;
+                            for (int currentY = 0; currentY < currentFrameBitmap.Size.y; currentY++)
+                            {
+                                var rawPixelColor = currentFrameBitmap.GetPixel(currentX, currentY);
+                                newAtlasBitmap.SetPixel(currentX + pixelOffsetX, currentY, in rawPixelColor);
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Error("Oh no, something bad happened, skipping to next frame: " + e.ToString());
+                    }
+                }
+                Msg($"... Frames parsing done");
+                newBitmap = newAtlasBitmap;
+            }
+
+
             var currentUri = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(newBitmap);
             StaticTexture2D currentTexture2D = currentSlot.AttachComponent<StaticTexture2D>();
             currentTexture2D.URL.Value = currentUri;
 
-            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Pointsample)) 
+            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Pointsample))
             {
                 currentTexture2D.FilterMode.Value = TextureFilterMode.Point;
             }
-            else if(currentVtf.Header.Flags.HasFlag(VtfImageFlag.Trilinear))
+            else if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Trilinear))
             {
                 currentTexture2D.FilterMode.Value = TextureFilterMode.Trilinear;
             }
-            else 
+            else
             {
                 currentTexture2D.FilterMode.Value = TextureFilterMode.Anisotropic;
                 currentTexture2D.AnisotropicLevel.Value = 8;
@@ -351,19 +413,19 @@ namespace Sledge2NeosVR
             {
                 currentTexture2D.IsNormalMap.Value = true;
 
-                 Utils.SSBumpToNormal(currentTexture2D);
+                Utils.SSBumpToNormal(currentTexture2D);
             }
 
             ImageImporter.SetupTextureProxyComponents(
-                currentSlot, 
+                currentSlot,
                 currentTexture2D,
-                StereoLayout.None, 
-                ImageProjection.Perspective, 
+                StereoLayout.None,
+                ImageProjection.Perspective,
                 false);
             ImageImporter.CreateQuad(
-                currentSlot, 
-                currentTexture2D, 
-                StereoLayout.None, 
+                currentSlot,
+                currentTexture2D,
+                StereoLayout.None,
                 true);
             currentSlot.AttachComponent<Grabbable>().Scalable.Value = true;
         }
