@@ -38,8 +38,8 @@ namespace Sledge2NeosVR
         [AutoRegisterConfigKey]
         internal static ModConfigurationKey<bool> tintSpecular = new("tintSpecular", "Tint Specular Textures on Import", () => false);
 
-        [AutoRegisterConfigKey]
-        internal static ModConfigurationKey<bool> importTexture = new("importTexture", "Import Textures", () => true);
+        //[AutoRegisterConfigKey]
+        //internal static ModConfigurationKey<bool> importTexture = new("importTexture", "Import Textures", () => true);
 
         [AutoRegisterConfigKey]
         internal static ModConfigurationKey<int> importTextureRow = new("textureRows", "Import Textures number of rows", () => 5);
@@ -50,11 +50,11 @@ namespace Sledge2NeosVR
         [AutoRegisterConfigKey]
         internal static ModConfigurationKey<bool> SSBumpAutoConvert = new("SSBump auto convert", "Auto convert SSBump to NormalMap", () => true);
 
-        [AutoRegisterConfigKey]
-        internal static ModConfigurationKey<bool> importMaterial = new("importMaterial", "Import Materials", () => true);
+        //[AutoRegisterConfigKey]
+        //internal static ModConfigurationKey<bool> importMaterial = new("importMaterial", "Import Materials", () => true);
 
-        [AutoRegisterConfigKey]
-        internal static ModConfigurationKey<int> importMaterialRow = new("materialRows", "Import Materials number of rows", () => 5);
+        //[AutoRegisterConfigKey]
+        //internal static ModConfigurationKey<int> importMaterialRow = new("materialRows", "Import Materials number of rows", () => 5);
         #endregion
 
         internal static Dictionary<string, VtfFile> vtfDictionary = new Dictionary<string, VtfFile>();
@@ -310,7 +310,6 @@ namespace Sledge2NeosVR
         private static async Task CreateTextureQuadFromVtf(string currentVtfName, VtfFile currentVtf, Slot currentSlot)
         {
             // Currently we only grab the last frame from the image for the highest resolution, first if you want the lowest
-            // TODO: add handling of multi frames textures and generate spirtesheet
 
             await default(ToWorld);
             currentSlot.PositionInFrontOfUser();
