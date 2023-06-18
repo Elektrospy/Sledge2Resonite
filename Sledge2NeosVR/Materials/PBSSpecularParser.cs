@@ -2,12 +2,10 @@
 using CodeX;
 using FrooxEngine;
 using Sledge.Formats.Texture.Vtf;
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using UnityEngine;
 using TextureFormat = CodeX.TextureFormat;
 
 namespace Sledge2NeosVR;
@@ -33,6 +31,8 @@ namespace Sledge2NeosVR;
 /// "$AmbientOcclTexture" "some/path/texturename" -> Ambient occlusion texture
 /// "$AmbientOcclColor" "[.4 .4 .4]" -> Ambient occlusion color tint (RGB format)
 /// "$AmbientOcclusion" "1" -> Controls strength of Ambient Occlusion. (1 = fully enabled, 0 = fully disabled)
+/// --- Height map ---
+/// "$heightmap" "some/path/texturename" -> Height map texture
 /// --- Specular map ---
 /// "$envmapmask" "some/path/texturename" -> Specular texture
 /// "$envmaptint" "[1 1 1]" -> Specular color tint(RGB format)
@@ -72,7 +72,7 @@ public abstract class PBSSpecularParser
 {
     protected readonly HashSet<string> propertyTextureNamesHashSet = new HashSet<string>()
     {
-        "$basetexture", "$detail", "$normalmap", "$bumpmap", "$envmapmask, $ambientoccltexture"
+        "$basetexture", "$detail", "$normalmap", "$bumpmap", "$heightmap", "$envmapmask, $ambientoccltexture"
     };
 
     protected readonly HashSet<char> multiValueEncloseCharHashset = new HashSet<char>()
@@ -148,7 +148,7 @@ public abstract class PBSSpecularParser
                     // So we need to invert the green channel
                     // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
                     normalmapBitmap = newBitmap;
-
+                    // TODO: add green channel invert again
                     if (Sledge2NeosVR.config.GetValue(Sledge2NeosVR.SSBumpAutoConvert) && currentProperty.Key == "$bumpmap")
                     {
                         Utils.SSBumpToNormal(currentTexture2D);
@@ -156,6 +156,9 @@ public abstract class PBSSpecularParser
 
                     currentTexture2D.IsNormalMap.Value = true;
                     currentMaterial.NormalMap.Target = currentTexture2D;
+                    break;
+                case "$heightmap":
+                    currentMaterial.HeightMap.Target = currentTexture2D;
                     break;
             }
             await default(ToBackground);

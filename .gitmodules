@@ -1,0 +1,3 @@
+[submodule "sledge-formats"]
+	path = sledge-formats
+	url = https://github.com/Elektrospy/sledge-formats.git

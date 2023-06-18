@@ -35,14 +35,12 @@ namespace Sledge2NeosVR
         }
 
         #region ModConfigurationKeys
-        [AutoRegisterConfigKey]
-        internal static ModConfigurationKey<bool> tintSpecular = new("tintSpecular", "Tint Specular Textures on Import", () => false);
-
-        //[AutoRegisterConfigKey]
-        //internal static ModConfigurationKey<bool> importTexture = new("importTexture", "Import Textures", () => true);
 
         [AutoRegisterConfigKey]
         internal static ModConfigurationKey<int> importTextureRow = new("textureRows", "Import Textures number of rows", () => 5);
+
+        [AutoRegisterConfigKey]
+        internal static ModConfigurationKey<bool> tintSpecular = new("tintSpecular", "Tint Specular Textures on Import", () => false);
 
         [AutoRegisterConfigKey]
         internal static ModConfigurationKey<bool> generateTextureAtlas = new("Generate frame atlas", "Auto generate atlas of multiframe textures", () => true);
@@ -51,17 +49,15 @@ namespace Sledge2NeosVR
         internal static ModConfigurationKey<bool> SSBumpAutoConvert = new("SSBump auto convert", "Auto convert SSBump to NormalMap", () => true);
 
         //[AutoRegisterConfigKey]
-        //internal static ModConfigurationKey<bool> importMaterial = new("importMaterial", "Import Materials", () => true);
+        internal static ModConfigurationKey<bool> invertNormalmapG = new("Invert normal map G ", "Invert the green color channel of normal maps", () => true);
 
-        //[AutoRegisterConfigKey]
-        //internal static ModConfigurationKey<int> importMaterialRow = new("materialRows", "Import Materials number of rows", () => 5);
         #endregion
 
         internal static Dictionary<string, VtfFile> vtfDictionary = new Dictionary<string, VtfFile>();
         internal static Dictionary<string, SerialisedObject> vmtDictionary = new Dictionary<string, SerialisedObject>();
         private static readonly HashSet<string> propertyTextureNamesHashSet = new HashSet<string>()
         {
-            "$basetexture", "$detail", "$normalmap", "$bumpmap", "$envmapmask", "$selfillumtexture", "$selfillummask"
+            "$basetexture", "$detail", "$normalmap", "$bumpmap", "$heightmap", "$envmapmask", "$selfillumtexture", "$selfillummask"
         };
 
         public override void OnEngineInit()
@@ -94,24 +90,22 @@ namespace Sledge2NeosVR
                     Msg("Importing sledge asset");
                     var slot = world.AddSlot("Loading Indicator", false);
                     slot.PositionInFrontOfUser();
-                    var loadingCircle = slot.AttachComponent<NeosLogoMenuProgress>();
-                    loadingCircle.Color = new color(0.95f, 0.48f, 0.13f);
-                    __result = ProcessSledgeImport(query, world, loadingCircle);
+                    __result = ProcessSledgeImport(query, world);
                 }
 
                 return true;
             }
         }
 
-        private static async Task ProcessSledgeImport(IEnumerable<string> inputFiles, World world, IProgressIndicator loadingCircle)
+        private static async Task ProcessSledgeImport(IEnumerable<string> inputFiles, World world)
         {
             await default(ToBackground);
-            await ParseInputFiles(inputFiles, world, loadingCircle, true);
+            await ParseInputFiles(inputFiles, world, true);
             ClearDictionaries();
             await default(ToWorld);
         }
 
-        private static async Task ParseInputFiles(IEnumerable<string> inputFiles, World world, IProgressIndicator loadingCircle, bool createQuads = false)
+        private static async Task ParseInputFiles(IEnumerable<string> inputFiles, World world, bool createQuads = false)
         {
             SerialisedObjectFormatter ValveSerialiser = new SerialisedObjectFormatter();
             string[] filesArr = inputFiles.ToArray();
@@ -131,8 +125,7 @@ namespace Sledge2NeosVR
                 }
                 catch (Exception ex)
                 {
-                    await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"Got an exception while opening the file: {filesArr[i]} {ex.Message}");
-                    // Error($"Got an exception while opening the file: {filesArr[i]} {ex.Message});
+                    Error($"Got an exception while opening the file: {filesArr[i]} {ex.Message}");
                     continue;
                 }
 
@@ -151,8 +144,7 @@ namespace Sledge2NeosVR
                         }
                         catch (Exception e)
                         {
-                            await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"Couldn't add vtf {currentFileName}, error: {e.Message}");
-                            // Error($"Couldn't add vtf {currentFileName}, error: {e.Message}");
+                            Error($"Couldn't add vtf {currentFileName}, error: {e.Message}");
                         }
 
                         if (!createQuads) return;
@@ -167,8 +159,7 @@ namespace Sledge2NeosVR
                         }
                         catch (Exception e)
                         {
-                            await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"Couldn't add Slot \"Texture: {currentFileName}\" to world, error: {e.Message}");
-                            // Error($"Couldn't add Slot \"Texture: {currentFileName}\" to world, error: {e.Message}");
+                            Error($"Couldn't add Slot \"Texture: {currentFileName}\" to world, error: {e.Message}");
                             continue;
                         }
 
@@ -195,8 +186,7 @@ namespace Sledge2NeosVR
                         }
                         catch (Exception e)
                         {
-                            await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"File read all lines error: {e.Message}");
-                            // Error($"File read all lines error: {e.Message}");
+                            Error($"File read all lines error: {e.Message}");
                             continue;
                         }
 
@@ -211,8 +201,7 @@ namespace Sledge2NeosVR
                             }
                             catch (Exception e)
                             {
-                                await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"File read all lines error: {e.Message}");
-                                // Error($"valve deserialize error: {e.Message}");
+                                Error($"valve deserialize error: {e.Message}");
                                 continue;
                             }
                         }
@@ -230,10 +219,9 @@ namespace Sledge2NeosVR
                                 string tempTexturePath = Utils.MergeTextureNameAndPath(currentProperty.Value, filesArr[i]);
 
                                 if (!string.IsNullOrEmpty(tempTexturePath))
-                                    await ParseInputFiles(new string[] { tempTexturePath }, world, loadingCircle);
+                                    await ParseInputFiles(new string[] { tempTexturePath }, world);
                                 else
-                                    await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", "Texture path is empty or null!");
-                                //Error("Texture path is empty or null!");
+                                    Error("Texture path is empty or null!");
                             }
                         }
 
@@ -241,8 +229,7 @@ namespace Sledge2NeosVR
                         if (vmtDictionary.ContainsKey(currentFileName))
                             await CreateMaterialOrbFromVmt(currentFileName, firstVmtObject);
                         else
-                            await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"Couldn't find {currentFileName} in vmt dictionary");
-                        // Error($"Couldn't find {currentFileName} in vmt dictionary");
+                            Error($"Couldn't find {currentFileName} in vmt dictionary");
 
                         vmtCounter++;
                         break;
@@ -258,8 +245,7 @@ namespace Sledge2NeosVR
                         }
                         catch (Exception ex)
                         {
-                            await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"Couldn't add Slot \"LUT: {currentFileName}\" to world, error: {ex.Message}");
-                            // Error($"Couldn't add Slot \"LUT: {currentFileName}\" to world, error: {ex.Message}");
+                            Error($"Couldn't add Slot \"LUT: {currentFileName}\" to world, error: {ex.Message}");
                             continue;
                         }
 
@@ -278,8 +264,7 @@ namespace Sledge2NeosVR
                         await NewLUTImport(filesArr[i], lutSlot);
                         break;
                     default:
-                        await UpdateProgressAsync(loadingCircle, $"Processing import {i}/{filesArr.Count()}", $"Unknown file ending: {currentFileEnding}");
-                        // Error($"Unknown file ending: {currentFileEnding}");
+                        Error($"Unknown file ending: {currentFileEnding}");
                         break;
                 }
 
@@ -287,7 +272,6 @@ namespace Sledge2NeosVR
             }
 
             await default(ToWorld);
-            loadingCircle.ProgressDone($"Imported all {filesArr.Count()} files!");
             await default(ToBackground);
         }
 
@@ -309,8 +293,7 @@ namespace Sledge2NeosVR
 
         private static async Task CreateTextureQuadFromVtf(string currentVtfName, VtfFile currentVtf, Slot currentSlot)
         {
-            // Currently we only grab the last frame from the image for the highest resolution, first if you want the lowest
-
+            
             await default(ToWorld);
             currentSlot.PositionInFrontOfUser();
             VtfImage currentVtfImage = currentVtf.Images.GetLast();
@@ -399,7 +382,8 @@ namespace Sledge2NeosVR
 
             // Check if normalmap flag is set and the name contains "_normal"
             // Come textures contain "flawed" flags within the header
-            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Normal) && currentVtfName.ToLower().Contains("_normal"))
+            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Normal) 
+            && (currentVtfName.ToLower().Contains("_normal") || currentVtfName.ToLower().Contains("_bump")))
             {
                 currentTexture2D.IsNormalMap.Value = true;
                 // Source engine uses the DirectX standard for normal maps, NeosVR uses OpenGL
@@ -408,10 +392,11 @@ namespace Sledge2NeosVR
                 currentTexture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
             }
 
-            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Ssbump) && config.GetValue(Sledge2NeosVR.SSBumpAutoConvert))
+            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Ssbump) 
+            && (currentVtfName.ToLower().Contains("_bump") || currentVtfName.ToLower().Contains("_ssbump")) 
+            && config.GetValue(Sledge2NeosVR.SSBumpAutoConvert))
             {
                 currentTexture2D.IsNormalMap.Value = true;
-
                 Utils.SSBumpToNormal(currentTexture2D);
             }
 
