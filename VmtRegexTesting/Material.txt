@@ -1,0 +1,29 @@
+﻿"LightmappedGeneric"
+{
+	"$basetexture" "bms/conveyor_beltface"
+	"$bumpmap" "bms/conveyor_beltface_normal"
+	"$nodecal"	"1"
+
+	"$phong" "1"
+	"$phongexponent" 5 // just a random comment for testing
+	"$phongboost"	"2"
+	"$phongfresnelranges"	"[1 2 4]"
+
+	"$surfaceprop" "rubber"
+	"%keywords" "bms"
+	"Proxies"
+	{
+		"TextureScroll"
+		{
+			"texturescrollvar" 						"$baseTextureTransform" // just a random comment for testing
+			"texturescrollrate" 0.98
+			"texturescrollangle" -90.00
+		}
+		"TextureScroll"
+		{
+			"texturescrollvar" "$bumptransform"
+			"texturescrollrate" 0.98
+			"texturescrollangle" -90.00
+		}
+	}
+}
