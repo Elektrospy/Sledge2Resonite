@@ -48,7 +48,7 @@ namespace Sledge2NeosVR
         [AutoRegisterConfigKey]
         internal static ModConfigurationKey<bool> SSBumpAutoConvert = new("SSBump auto convert", "Auto convert SSBump to NormalMap", () => true);
 
-        //[AutoRegisterConfigKey]
+        [AutoRegisterConfigKey]
         internal static ModConfigurationKey<bool> invertNormalmapG = new("Invert normal map G ", "Invert the green color channel of normal maps", () => true);
 
         #endregion
