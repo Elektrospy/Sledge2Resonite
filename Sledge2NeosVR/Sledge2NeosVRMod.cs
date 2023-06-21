@@ -88,8 +88,6 @@ namespace Sledge2NeosVR
                 if (query.Any())
                 {
                     Msg("Importing sledge asset");
-                    var slot = world.AddSlot("Loading Indicator", false);
-                    slot.PositionInFrontOfUser();
                     __result = ProcessSledgeImport(query, world);
                 }
 
