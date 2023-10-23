@@ -1,24 +1,41 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+	<PropertyGroup>
+		<AppName>Resonite</AppName>
+		<ModLoaderShort>rml</ModLoaderShort>
 
-  <ItemGroup>
-    <None Remove="Floats" />
-    <None Remove="NewFile1.txt" />
-  </ItemGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net6.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
 
-  <ItemGroup>
-    <Reference Include="BaseX">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\NeosVR\BaseX.dll</HintPath>
-    </Reference>
-    <Reference Include="FrooxEngine">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\NeosVR\Neos_Data\Managed\FrooxEngine.dll</HintPath>
-    </Reference>
-  </ItemGroup>
+		<AppPath>$(MSBuildThisFileDirectory)$(AppName)</AppPath>
+		<AppPath Condition="Exists('E:\Programs\Steam\steamapps\common\$(AppName)')">E:\Programs\Steam\steamapps\common\$(AppName)\</AppPath>
+		<AppPath Condition="Exists('E:\SteamLibrary\steamapps\common\$(AppName)')">E:\SteamLibrary\steamapps\common\$(AppName)\</AppPath>
+		<AppPath Condition="Exists('$(HOME)/.steam/steam/steamapps/common/$(AppName)/')">$(HOME)/.steam/steam/steamapps/common/$(AppName)/</AppPath>
+		<AppPath Condition="Exists('C:\Program Files (x86)\Steam\steamapps\common\$(AppName)\')">C:\Program Files (x86)\Steam\steamapps\common\$(AppName)\</AppPath>
+
+		<AppData Condition="Exists('$(AppPath)$(AppName)_Data')">$(AppPath)$(AppName)_Data\Managed\</AppData>
+
+		<AlternateDataPath>$(AppPath)\Alt\</AlternateDataPath>
+		<AlternateDataPath Condition="Exists('$(AppPath)')">$(AppPath)_altData</AlternateDataPath>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Remove="Floats" />
+		<None Remove="NewFile1.txt" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Reference Include="Elements.Core">
+			<HintPath>$(AppData)Elements.Core.dll</HintPath>
+		</Reference>
+		<Reference Include="FrooxEngine">
+			<HintPath>$(AppData)FrooxEngine.dll</HintPath>
+		</Reference>
+		<Reference Include="UnityEngine">
+		  <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Resonite\Resonite_Data\Managed\UnityEngine.dll</HintPath>
+		</Reference>
+	</ItemGroup>
 
 </Project>

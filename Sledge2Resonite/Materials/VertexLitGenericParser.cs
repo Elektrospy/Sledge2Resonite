@@ -1,4 +1,4 @@
-﻿namespace Sledge2NeosVR;
+﻿namespace Sledge2Resonite;
 
 public class VertexLitGenericParser : PBSSpecularParser
 {

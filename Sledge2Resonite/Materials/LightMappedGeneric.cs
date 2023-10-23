@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Sledge2NeosVR;
+namespace Sledge2Resonite;
 
 public class LightMappedGeneric : PBSSpecularParser
 {
