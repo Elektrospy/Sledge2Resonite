@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text.RegularExpressions;
 
-namespace Sledge2NeosVR;
+namespace Sledge2Resonite;
 
 /// <summary>
 /// Does not touch source file, only makes a copy and returns a parsed version

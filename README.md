@@ -1,29 +1,29 @@
-# Sledge2NeosVR
+# Sledge2Resonite
 
-A [NeosModLoader](https://github.com/zkxs/NeosModLoader) mod for [Neos VR](https://neos.com/)  
+A [ResoniteModLoader](https://github.com/resonite-modding-group/ResoniteModLoader) mod for [Resonite](https://resonite.com/) 
 Enables users to import their own sledge file format based assets.
 
-Only parcial support of *.vmt and *.vtf files for now
+Only partial support of *.vmt and *.vtf files for now
 
 ## Self compile
-1. Install [NeosModLoader](https://github.com/zkxs/NeosModLoader).
+1. Install [ResoniteModLoader](https://github.com/resonite-modding-group/ResoniteModLoader).
 2. Clone this Repository
 3. Implement the methods you need to for your project. Said methods are outlined in the comments.
-4. Build and place your DLL's under "nml_mods". 
-  This folder should be at `C:\Program Files (x86)\Steam\steamapps\common\NeosVR\nml_mods` for a default install. 
-  You can create it if it's missing, or if you launch the game once with NeosModLoader.
+4. Build and place your DLL's under "rml_mods". 
+  This folder should be at `C:\Program Files (x86)\Steam\steamapps\common\Resonite\rml_mods` for a default install. 
+  You can create it if it's missing, or if you launch the game once with ResoniteModLoader.
 5. Start the game!
 
 ## Install prebuild
-1. Install [NeosModLoader](https://github.com/zkxs/NeosModLoader).
+1. Install [ResoniteModLoader](https://github.com/resonite-modding-group/ResoniteModLoader).
 2. Get prebuild *.dlls from release page
-3. Place the DLL's under "nml_mods". 
-  This folder should be at `C:\Program Files (x86)\Steam\steamapps\common\NeosVR\nml_mods` for a default install. 
-  You can create it if it's missing, or if you launch the game once with NeosModLoader.
+3. Place the DLL's under "rml_mods". 
+  This folder should be at `C:\Program Files (x86)\Steam\steamapps\common\Resonite\rml_mods` for a default install. 
+  You can create it if it's missing, or if you launch the game once with ResoniteModLoader.
 4. Start the game!
 
 ## Usage
-Drag and drop the file you want to import onto the NeosVR window.
+Drag and drop the file you want to import onto the Resonite window.
 The mod will try to do an in place conversion and spawn the result in front of you.
 
 ## Supported files
@@ -57,7 +57,7 @@ The mod will try to do an in place conversion and spawn the result in front of y
 * 2 and 4 way blend materials (e.g. terrain) will only import the first layer textures
   * color splat material conversion is not implemented at this stage
 * Specular color tints look weird
-  * This is a NeosVR specific issue, since the tint doesn't only affect the reflective parts.
+  * This is a Resonite specific issue, since the tint doesn't only affect the reflective parts.
   * Instead the rgb part of the specular is applied like a detail texture and will just be overlaid on top the albedo
 
 ### Contributors

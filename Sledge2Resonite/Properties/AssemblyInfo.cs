@@ -4,11 +4,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("Sledge2NeosVR")]
+[assembly: AssemblyTitle("Sledge2Resonite")]
 [assembly: AssemblyDescription("Imports Valve Source Engine Materials and Textures")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("The Science Team")]
-[assembly: AssemblyProduct("Sledge2NeosVR")]
+[assembly: AssemblyProduct("Sledge2Resonite")]
 [assembly: AssemblyCopyright("Copyright ©  2023")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

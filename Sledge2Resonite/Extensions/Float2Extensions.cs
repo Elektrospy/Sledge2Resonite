@@ -1,4 +1,4 @@
-﻿using BaseX;
+﻿using Elements.Core;
 using System.Globalization;
 
 public static class Float2Extensions

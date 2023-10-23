@@ -1,7 +1,7 @@
-﻿using BaseX;
+﻿using Elements.Core;
 using System;
 
-namespace Sledge2NeosVR;
+namespace Sledge2Resonite;
 
 public class VMTPreprocessor : Preprocessor
 {

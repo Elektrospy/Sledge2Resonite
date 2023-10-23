@@ -1,8 +1,8 @@
-﻿using BaseX;
-using CodeX;
+﻿using Elements.Core;
+using Elements.Assets;
 using FrooxEngine;
 using HarmonyLib;
-using NeosModLoader;
+using ResoniteModLoader;
 using Sledge.Formats.Valve;
 using Sledge.Formats.Texture.Vtf;
 using System;
@@ -13,17 +13,16 @@ using System.Text;
 using System.Threading.Tasks;
 using File = System.IO.File;
 using FrooxEngine.Undo;
-using TextureFormat = CodeX.TextureFormat;
-using UnityEngine;
+using TextureFormat = Elements.Assets.TextureFormat;
 
-namespace Sledge2NeosVR
+namespace Sledge2Resonite
 {
-    public class Sledge2NeosVR : NeosMod
+    public class Sledge2Resonite : ResoniteMod
     {
-        public override string Name => "Sledge2NeosVR";
+        public override string Name => "Sledge2Resonite";
         public override string Author => "Elektrospy";
         public override string Version => "0.1.0";
-        public override string Link => "https://github.com/Elektrospy/Sledge2NeosVR";
+        public override string Link => "https://github.com/Elektrospy/Sledge2Resonite";
 
         internal static ModConfiguration config;
 
@@ -62,7 +61,7 @@ namespace Sledge2NeosVR
 
         public override void OnEngineInit()
         {
-            new Harmony("net.Elektrospy.Sledge2NeosVR").PatchAll();
+            new Harmony("net.Elektrospy.Sledge2Resonite").PatchAll();
             config = GetConfiguration();
             Engine.Current.RunPostInit(() => AssetPatch());
         }
@@ -302,12 +301,13 @@ namespace Sledge2NeosVR
                 currentVtfImage.Height,
                 TextureFormat.BGRA32,
                 false,
+                ColorProfile.Linear,
                 false);
 
-            if (config.GetValue(Sledge2NeosVR.generateTextureAtlas))
+            if (config.GetValue(Sledge2Resonite.generateTextureAtlas))
             {
                 var imageList = currentVtf.Images;
-                var mipmapNumber = currentVtf.Header.mipmapCount;
+                var mipmapNumber = currentVtf.Header.MipmapCount;
                 var framesNumberRaw = imageList.Count;
                 var framesNumber = framesNumberRaw / mipmapNumber;
                 var bytesNumber = currentVtfImage.Width * currentVtfImage.Height * 4 * framesNumber;
@@ -320,6 +320,7 @@ namespace Sledge2NeosVR
                     currentVtfImage.Height,
                     TextureFormat.BGRA32,
                     false,
+                    ColorProfile.Linear,
                     false);
                 Msg($"Generated atlas bitmap with Width: {newAtlasBitmap.Size.x} and Height: {newAtlasBitmap.Size.y}");
 
@@ -338,6 +339,7 @@ namespace Sledge2NeosVR
                             currentFrameImage.Height,
                             TextureFormat.BGRA32,
                             false,
+                            ColorProfile.Linear,
                             false);
 
                         for (int currentX = 0; currentX < currentFrameBitmap.Size.x; currentX++)
@@ -392,7 +394,7 @@ namespace Sledge2NeosVR
 
             if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Ssbump) 
             && (currentVtfName.ToLower().Contains("_bump") || currentVtfName.ToLower().Contains("_ssbump")) 
-            && config.GetValue(Sledge2NeosVR.SSBumpAutoConvert))
+            && config.GetValue(Sledge2Resonite.SSBumpAutoConvert))
             {
                 currentTexture2D.IsNormalMap.Value = true;
                 Utils.SSBumpToNormal(currentTexture2D);
@@ -422,7 +424,7 @@ namespace Sledge2NeosVR
             try
             {
                 var rawBytes = File.ReadAllBytes(path);
-                rawBitmap2D = new Bitmap2D(rawBytes, sourceLUTWidth, sourceLUTHeight, TextureFormat.RGB24, false, false);
+                rawBitmap2D = new Bitmap2D(rawBytes, sourceLUTWidth, sourceLUTHeight, TextureFormat.RGB24, false, ColorProfile.Linear, false);
             }
             catch (Exception e)
             {
@@ -438,7 +440,7 @@ namespace Sledge2NeosVR
             Debug("Bitmap2D has a valid resolution");
 
             const int pixelBoxSideLength = 32;
-            var texture = new Bitmap3D(pixelBoxSideLength, pixelBoxSideLength, pixelBoxSideLength, TextureFormat.RGB24, false);
+            var texture = new Bitmap3D(pixelBoxSideLength, pixelBoxSideLength, pixelBoxSideLength, TextureFormat.RGB24, false, ColorProfile.Linear);
 
             // This is dark got-dayum magic. Elektro somehow got this to work, I don't know how many hours we threw at this.
             // Converting our .raws to .pngs alone was a royal pain in the ass. Good riddance -dfg
