@@ -14,9 +14,6 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VmtRegexTesting", "..\VmtRegexTesting\VmtRegexTesting.csproj", "{46149481-897A-4A3E-BBE2-70C0F9BE2820}"
 EndProject
 
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ValveResourceFormat", "..\..\ValveResourceFormat\ValveResourceFormat\ValveResourceFormat.csproj", "{1D96636D-D90B-4F1B-9430-33ED1A03C8E8}"
-EndProject
-
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
