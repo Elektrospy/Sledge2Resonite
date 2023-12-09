@@ -54,6 +54,9 @@
         <Reference Include="FrooxEngine">
             <HintPath>$(AppData)FrooxEngine.dll</HintPath>
         </Reference>
+        <Reference Include="FrooxEngine">
+            <HintPath>$(AppData)FrooxEngine.Store.dll</HintPath>
+        </Reference>
         <Reference Include="Sledge.Formats">
           <HintPath>..\sledge-formats\Sledge.Formats.Texture\bin\Release\netstandard2.0\Sledge.Formats.dll</HintPath>
         </Reference>
