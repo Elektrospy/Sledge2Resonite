@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	
     <PropertyGroup>
 	    <AppName>Resonite</AppName>
@@ -41,9 +41,11 @@
     </ItemGroup>
   
     <ItemGroup>
-        <Reference Include="FrooxEngine.Store">
-          <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Resonite\Resonite_Data\Managed\FrooxEngine.Store.dll</HintPath>
-        </Reference>
+      <ProjectReference Include="..\sledge-formats\Sledge.Formats.Texture\Sledge.Formats.Texture.csproj" />
+      <ProjectReference Include="..\sledge-formats\Sledge.Formats\Sledge.Formats.csproj" />
+    </ItemGroup>
+  
+    <ItemGroup>
         <Reference Include="HarmonyLib">
             <HintPath>$(AppPath)$(ModLoaderShort)_libs\0Harmony.dll</HintPath>
             <HintPath Condition="Exists('$(AppPath)0Harmony.dll')">$(AppPath)0Harmony.dll</HintPath>
@@ -57,11 +59,8 @@
         <Reference Include="FrooxEngine">
             <HintPath>$(AppData)FrooxEngine.dll</HintPath>
         </Reference>
-        <Reference Include="Sledge.Formats">
-          <HintPath>..\sledge-formats\Sledge.Formats.Texture\bin\Release\netstandard2.0\Sledge.Formats.dll</HintPath>
-        </Reference>
-        <Reference Include="Sledge.Formats.Texture">
-          <HintPath>..\sledge-formats\Sledge.Formats.Texture\bin\Release\netstandard2.0\Sledge.Formats.Texture.dll</HintPath>
+        <Reference Include="FrooxEngine">
+            <HintPath>$(AppData)FrooxEngine.Store.dll</HintPath>
         </Reference>
 	    <Reference Include="UnityEngine">
 		    <HintPath>$(AppData)UnityEngine.dll</HintPath>
