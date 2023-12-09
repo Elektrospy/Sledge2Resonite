@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using File = System.IO.File;
 using FrooxEngine.Undo;
 using TextureFormat = Elements.Assets.TextureFormat;
+using System.Xml.Linq;
 
 namespace Sledge2Resonite
 {
@@ -21,22 +22,24 @@ namespace Sledge2Resonite
     {
         public override string Name => "Sledge2Resonite";
         public override string Author => "Elektrospy";
-        public override string Version => "0.1.0";
+        public override string Version => "0.1.1";
         public override string Link => "https://github.com/Elektrospy/Sledge2Resonite";
 
         internal static ModConfiguration config;
 
+        private static Slot importSlot;
+
         public override void DefineConfiguration(ModConfigurationDefinitionBuilder builder)
         {
             builder
-                .Version(new Version(0, 1, 0))
+                .Version(new Version(0, 1, 1))
                 .AutoSave(true);
         }
 
         #region ModConfigurationKeys
 
         [AutoRegisterConfigKey]
-        internal static ModConfigurationKey<int> importTextureRow = new("textureRows", "Import Textures number of rows", () => 5);
+        internal static ModConfigurationKey<int> importObjPerRow = new("importRows", "Number of objects per row", () => 5);
 
         [AutoRegisterConfigKey]
         internal static ModConfigurationKey<bool> tintSpecular = new("tintSpecular", "Tint Specular Textures on Import", () => false);
@@ -48,7 +51,7 @@ namespace Sledge2Resonite
         internal static ModConfigurationKey<bool> SSBumpAutoConvert = new("SSBump auto convert", "Auto convert SSBump to NormalMap", () => true);
 
         [AutoRegisterConfigKey]
-        internal static ModConfigurationKey<bool> invertNormalmapG = new("Invert normal map G ", "Invert the green color channel of normal maps", () => true);
+        internal static ModConfigurationKey<bool> invertNormalmapG = new("Invert normal map G", "Invert the green color channel of normal maps", () => true);
 
         #endregion
 
@@ -97,17 +100,71 @@ namespace Sledge2Resonite
         private static async Task ProcessSledgeImport(IEnumerable<string> inputFiles, World world)
         {
             await default(ToBackground);
+
+            if (!inputFiles.Any())
+            {
+                Error($"Nothing to import!");
+                return;
+            }
+
+            // create collective slot if there is multiple files
+            if(inputFiles.Count() > 1) 
+            {
+                await CreateImportSlot();
+            }
+            
+
             await ParseInputFiles(inputFiles, world, true);
+
+            if (inputFiles.Count() > 1)
+            {
+                try
+                {
+                    // add self destruct, which triggers if there is no objects parented underneatn
+                    await default(ToWorld);
+                    importSlot.AttachComponent<DestroyWithoutChildren>();
+                    await default(ToBackground);
+                }
+                catch (Exception e)
+                {
+                    Error($"Couldn't add Component \"DestroyWithoutChildren\" to importSlot, error: {e.Message}");
+                    await default(ToBackground);
+                }
+            }
+
             ClearDictionaries();
+            
             await default(ToWorld);
+        }
+
+        private static async Task<bool> CreateImportSlot()
+        {
+            try
+            {
+                await default(ToWorld); // we need to wait, or else the slot is not accessible
+                importSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Imported Sledge Files");
+                importSlot.PositionInFrontOfUser();
+                importSlot.CreateSpawnUndoPoint();
+                await default(ToBackground);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Error($"Couldn't add Slot \"Imported Sledge Files\" to world, error: {e.Message}");
+                await default(ToBackground);
+                return false;
+            }
         }
 
         private static async Task ParseInputFiles(IEnumerable<string> inputFiles, World world, bool createQuads = false)
         {
             SerialisedObjectFormatter ValveSerialiser = new SerialisedObjectFormatter();
             string[] filesArr = inputFiles.ToArray();
-            int vtfCounter = 0;
-            int vmtCounter = 0;
+            // Add parent slot to world, so we can add importing files underneath
+            Slot currentParentSlot = importSlot;
+
+            //small test to see how stuff happens
+            Msg($"Importing {inputFiles.Count()} files");
 
             for (int i = 0; i < filesArr.Count(); ++i)
             {
@@ -126,12 +183,21 @@ namespace Sledge2Resonite
                     continue;
                 }
 
+                // split file name and ending
                 string currentFileName = currentFileInfo.Name.Split('.').First();
+                if (string.IsNullOrEmpty(currentFileName))
+                {
+                    Error("Filename is empty!");
+                    continue;
+                }
+
+                // decide what todo based on file ending
                 string currentFileEnding = currentFileInfo.Extension;
                 switch (currentFileEnding)
                 {
                     case ".vtf":
-                        VtfFile tempVtf = new VtfFile(fs);
+                        // import texture
+                        VtfFile tempVtf = new(fs);
                         try
                         {
                             if (vtfDictionary.ContainsKey(currentFileName))
@@ -143,39 +209,24 @@ namespace Sledge2Resonite
                         {
                             Error($"Couldn't add vtf {currentFileName}, error: {e.Message}");
                         }
-
-                        if (!createQuads) return;
-
-                        // Add undoable slot to world, so we can append components
-                        Slot currentSlot;
-                        await default(ToWorld);
-                        try
-                        {
-                            currentSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Texture: " + currentFileName);
-                            currentSlot.CreateSpawnUndoPoint();
-                        }
-                        catch (Exception e)
-                        {
-                            Error($"Couldn't add Slot \"Texture: {currentFileName}\" to world, error: {e.Message}");
-                            continue;
-                        }
+                        // create texture from VTF file
+                        Slot currentSlot = await NewTextureFromVTF(tempVtf, currentFileName, currentParentSlot);
 
                         // Check if this is the first time
-                        if (vtfCounter == 0)
+                        if (i != 0)
                         {
-                            currentSlot.PositionInFrontOfUser();
+                            await default(ToWorld);
+                            currentSlot.LocalPosition += UniversalImporter.GridOffset(ref i, config.GetValue(importObjPerRow));
+                            await default(ToBackground);
                         }
-                        else
-                        {
-                            currentSlot.PositionInFrontOfUser();
-                            float3 offset = UniversalImporter.GridOffset(ref vtfCounter, config.GetValue(importTextureRow));
-                            currentSlot.GlobalPosition += offset;
-                            vtfCounter++;
-                        }
+
+                        // create texture quad in world
                         await CreateTextureQuadFromVtf(currentFileName, tempVtf, currentSlot);
+
                         break;
                     case ".vmt":
-                        VMTPreprocessor vmtPrePros = new VMTPreprocessor();
+                        // import material
+                        VMTPreprocessor vmtPrePros = new();
                         string fileLines;
                         try
                         {
@@ -216,29 +267,36 @@ namespace Sledge2Resonite
                                 string tempTexturePath = Utils.MergeTextureNameAndPath(currentProperty.Value, filesArr[i]);
 
                                 if (!string.IsNullOrEmpty(tempTexturePath))
+                                {
+                                    // TODO: change from general parser, to more specific method
                                     await ParseInputFiles(new string[] { tempTexturePath }, world);
-                                else
+                                }
+                                else {
                                     Error("Texture path is empty or null!");
+                                }
                             }
                         }
 
                         // Try to create material orb from dictionary
                         if (vmtDictionary.ContainsKey(currentFileName))
-                            await CreateMaterialOrbFromVmt(currentFileName, firstVmtObject);
+                        {
+                            var currentMaterialSlot = currentParentSlot.AddSlot("Material: " + currentFileName);
+                            await CreateMaterialOrbFromVmt(firstVmtObject, currentMaterialSlot);
+                        }
                         else
                             Error($"Couldn't find {currentFileName} in vmt dictionary");
 
-                        vmtCounter++;
                         break;
 
                     case ".raw":
+                        // luts
                         // Add undoable slot to world, so we can append components
                         Slot lutSlot;
-                        await default(ToWorld);
                         try
                         {
-                            lutSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("LUT: " + currentFileName);
-                            lutSlot.CreateSpawnUndoPoint();
+                            await default(ToWorld);
+                            lutSlot = currentParentSlot.AddSlot("LUT: " + currentFileName);
+                            await default(ToBackground);
                         }
                         catch (Exception ex)
                         {
@@ -247,21 +305,14 @@ namespace Sledge2Resonite
                         }
 
                         // Check if this is the first time
-                        if (vtfCounter == 0)
+                        if (i != 0)
                         {
-                            lutSlot.PositionInFrontOfUser();
-                        }
-                        else
-                        {
-                            lutSlot.PositionInFrontOfUser();
-                            float3 offset = UniversalImporter.GridOffset(ref vtfCounter, config.GetValue(importTextureRow));
-                            lutSlot.GlobalPosition += offset;
-                            vtfCounter++;
+                            lutSlot.LocalPosition += UniversalImporter.GridOffset(ref i, config.GetValue(importObjPerRow));
                         }
                         await NewLUTImport(filesArr[i], lutSlot);
                         break;
                     default:
-                        Error($"Unknown file ending: {currentFileEnding}");
+                        Error($"Unsupported file ending: {currentFileEnding}");
                         break;
                 }
 
@@ -272,27 +323,18 @@ namespace Sledge2Resonite
             await default(ToBackground);
         }
 
-        private static async Task CreateMaterialOrbFromVmt(string currentVmtName, SerialisedObject currentSerialisedObject)
+        private static async Task CreateMaterialOrbFromVmt(SerialisedObject currentSerialisedObject, Slot currentSlot)
         {
-            if (string.IsNullOrEmpty(currentVmtName))
-            {
-                Error("Vmt name is empty!");
-                return;
-            }
-
             Msg($"Current material shader: {currentSerialisedObject.Name}");
             // TODO: add more material shader parsers
-
             await default(ToBackground);
             VertexLitGenericParser vertexLitGenericParser = new VertexLitGenericParser();
-            await vertexLitGenericParser.ParseMaterial(currentSerialisedObject.Properties, currentVmtName);
+            await vertexLitGenericParser.ParseMaterial(currentSerialisedObject.Properties, currentSlot);
         }
 
         private static async Task CreateTextureQuadFromVtf(string currentVtfName, VtfFile currentVtf, Slot currentSlot)
         {
-            
             await default(ToWorld);
-            currentSlot.PositionInFrontOfUser();
             VtfImage currentVtfImage = currentVtf.Images.GetLast();
 
             var newBitmap = new Bitmap2D(
@@ -389,7 +431,7 @@ namespace Sledge2Resonite
                 // Source engine uses the DirectX standard for normal maps, NeosVR uses OpenGL
                 // so we need to invert the green channel
                 // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
-                currentTexture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
+                await currentTexture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
             }
 
             if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Ssbump) 
@@ -477,6 +519,27 @@ namespace Sledge2Resonite
             lutMat.LUT.Target = lutTex;
 
             MaterialOrb.ConstructMaterialOrb(lutMat, targetSlot);
+        }
+
+        private static async Task<Slot> NewTextureFromVTF(VtfFile tempVtf, string currentFileName, Slot targetSlot) {
+            Slot currentSlot = null;
+
+            try
+            {
+                string newSlotName = "Texture: " + currentFileName;
+                Msg("Adding new slot for texture import: \"" + newSlotName + "\"");
+                await default(ToWorld);
+                // Add slot to world, so we can append components
+                currentSlot = targetSlot.AddSlot(newSlotName);
+                await default(ToBackground);
+            }
+            catch (Exception e)
+            {
+                Error($"Couldn't add Slot \"Texture: {currentFileName}\" to world, error: {e.Message}");
+                return currentSlot;
+            }
+
+            return currentSlot;
         }
 
         private static void ClearDictionaries()

@@ -80,11 +80,9 @@ public abstract class PBSSpecularParser
         '{', '}', '[', ']'
     };
 
-    public virtual async Task<PBS_Specular> ParseMaterial(List<KeyValuePair<string, string>> properties, string name)
+    public virtual async Task<PBS_Specular> ParseMaterial(List<KeyValuePair<string, string>> properties, Slot currentSlot)
     {
         await default(ToWorld);
-        var currentSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Material: " + name);
-        currentSlot.PositionInFrontOfUser();
         var currentMaterial = currentSlot.CreateMaterialOrb<PBS_Specular>();
         await default(ToBackground);
 
@@ -110,7 +108,7 @@ public abstract class PBSSpecularParser
                 continue;
             }
 
-            // VTF contains mip-maps, but we only care about the last original image
+            // VTF contain mip-maps, but we only care about the last original image
             VtfImage currentVtfImage = currentVtf.Images.GetLast();
             var newBitmap = new Bitmap2D(currentVtfImage.GetBgra32Data(), currentVtfImage.Width, currentVtfImage.Height, TextureFormat.BGRA32, false, ColorProfile.Linear, false);
             await default(ToWorld);
