@@ -41,6 +41,9 @@
     </ItemGroup>
   
     <ItemGroup>
+        <Reference Include="FrooxEngine.Store">
+          <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Resonite\Resonite_Data\Managed\FrooxEngine.Store.dll</HintPath>
+        </Reference>
         <Reference Include="HarmonyLib">
             <HintPath>$(AppPath)$(ModLoaderShort)_libs\0Harmony.dll</HintPath>
             <HintPath Condition="Exists('$(AppPath)0Harmony.dll')">$(AppPath)0Harmony.dll</HintPath>

@@ -112,6 +112,10 @@ namespace Sledge2Resonite
             {
                 await CreateImportSlot();
             }
+            else // or fallback to same slot as the user doing the import
+            {
+                importSlot = world.LocalUserSpace;
+            }
             
 
             await ParseInputFiles(inputFiles, world, true);
@@ -156,7 +160,7 @@ namespace Sledge2Resonite
             }
         }
 
-        private static async Task ParseInputFiles(IEnumerable<string> inputFiles, World world, bool createQuads = false)
+        private static async Task ParseInputFiles(IEnumerable<string> inputFiles, World world, bool createQuads = true)
         {
             SerialisedObjectFormatter ValveSerialiser = new SerialisedObjectFormatter();
             string[] filesArr = inputFiles.ToArray();
@@ -221,7 +225,10 @@ namespace Sledge2Resonite
                         }
 
                         // create texture quad in world
-                        await CreateTextureQuadFromVtf(currentFileName, tempVtf, currentSlot);
+                        if(createQuads)
+                        {
+                            await CreateTextureQuadFromVtf(currentFileName, tempVtf, currentSlot);
+                        }
 
                         break;
                     case ".vmt":
@@ -269,7 +276,7 @@ namespace Sledge2Resonite
                                 if (!string.IsNullOrEmpty(tempTexturePath))
                                 {
                                     // TODO: change from general parser, to more specific method
-                                    await ParseInputFiles(new string[] { tempTexturePath }, world);
+                                    await ParseInputFiles(new string[] { tempTexturePath }, world, false);
                                 }
                                 else {
                                     Error("Texture path is empty or null!");

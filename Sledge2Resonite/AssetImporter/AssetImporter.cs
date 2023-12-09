@@ -11,7 +11,8 @@ namespace Sledge2Resonite
 {
     internal abstract class AssetImporter<T, U> where U : IAssetProvider
     {
-        Dictionary<string, Asset<T, U>> assets { get; set; } = new();
+        protected Dictionary<string, Asset<T, U>> assets { get; set; } = new();
+
         public Asset<T, U> ImportAsset(string filePath)
         {
             //check if file exists
@@ -39,6 +40,7 @@ namespace Sledge2Resonite
             }
 
             Asset<T, U> asset = PreProcessAsset(fileStream);
+            asset.name = name;
             assets.Add(name, asset);
             return asset;
         }
