@@ -148,9 +148,12 @@ public abstract class PBSSpecularParser
                     // So we need to invert the green channel
                     // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
                     normalmapBitmap = newBitmap;
-                    // TODO: add green channel invert again
-                    if (Sledge2Resonite.config.GetValue(Sledge2Resonite.SSBumpAutoConvert) && currentProperty.Key == "$bumpmap")
+                    // TODO: check if adding green channel invert is necessary
+                    if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Ssbump) 
+                    && (currentTextureName.ToLower().Contains("_bump") || currentTextureName.ToLower().Contains("_ssbump")) 
+                    && Sledge2Resonite.config.GetValue(Sledge2Resonite.SSBumpAutoConvert))
                     {
+                        currentTexture2D.IsNormalMap.Value = true;
                         Utils.SSBumpToNormal(currentTexture2D);
                     }
 
