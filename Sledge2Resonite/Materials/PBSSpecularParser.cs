@@ -149,8 +149,11 @@ public abstract class PBSSpecularParser
                     // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
                     normalmapBitmap = newBitmap;
                     // TODO: add green channel invert again
-                    if (Sledge2Resonite.config.GetValue(Sledge2Resonite.SSBumpAutoConvert) && currentProperty.Key == "$bumpmap")
+                    if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Ssbump)
+                    && (currentTextureName.ToLower().Contains("_bump") || currentTextureName.ToLower().Contains("_ssbump"))
+                    && Sledge2Resonite.config.GetValue(Sledge2Resonite.SSBumpAutoConvert))
                     {
+                        currentTexture2D.IsNormalMap.Value = true;
                         Utils.SSBumpToNormal(currentTexture2D);
                     }
 
@@ -543,12 +546,7 @@ public abstract class PBSSpecularParser
             {
                 var originalPixel = albedo.GetPixel(x, y);
                 var donorPixel = donor.GetPixel(x, y);
-                albedo.SetPixel(x, y,
-                    new color(
-                        originalPixel.r,
-                        originalPixel.g,
-                        originalPixel.b,
-                        donorPixel.a));
+                albedo.SetPixel(x, y, new color(originalPixel.r, originalPixel.g, originalPixel.b, donorPixel.a));
             }
         }
 
