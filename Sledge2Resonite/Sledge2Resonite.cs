@@ -112,7 +112,6 @@ namespace Sledge2Resonite
             {
                 await CreateImportSlot();
             }
-            
 
             await ParseInputFiles(inputFiles, world, true);
 
@@ -137,12 +136,12 @@ namespace Sledge2Resonite
             await default(ToWorld);
         }
 
-        private static async Task<bool> CreateImportSlot()
+        private static async Task<bool> CreateImportSlot(string SlotName = "Imported Sledge Files")
         {
             try
             {
                 await default(ToWorld); // we need to wait, or else the slot is not accessible
-                importSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot("Imported Sledge Files");
+                importSlot = Engine.Current.WorldManager.FocusedWorld.AddSlot(SlotName);
                 importSlot.PositionInFrontOfUser();
                 importSlot.CreateSpawnUndoPoint();
                 await default(ToBackground);
@@ -209,10 +208,18 @@ namespace Sledge2Resonite
                         {
                             Error($"Couldn't add vtf {currentFileName}, error: {e.Message}");
                         }
+
+                        // create import slot if missing
+                        if (currentParentSlot == null)
+                        {
+                            await CreateImportSlot("Texture: " + currentFileName);
+                            currentParentSlot = importSlot;
+                        }
+
                         // create texture from VTF file
                         Slot currentSlot = await NewTextureFromVTF(tempVtf, currentFileName, currentParentSlot);
 
-                        // Check if this is the first time
+                        // check if this is the first time
                         if (i != 0)
                         {
                             await default(ToWorld);
@@ -280,8 +287,19 @@ namespace Sledge2Resonite
                         // Try to create material orb from dictionary
                         if (vmtDictionary.ContainsKey(currentFileName))
                         {
-                            var currentMaterialSlot = currentParentSlot.AddSlot("Material: " + currentFileName);
-                            await CreateMaterialOrbFromVmt(firstVmtObject, currentMaterialSlot);
+                            // create import slot if missing
+                            if (currentParentSlot == null)
+                            {
+                                await CreateImportSlot("Material: " + currentFileName);
+                                var currentMaterialSlot = importSlot;
+                                await CreateMaterialOrbFromVmt(firstVmtObject, currentMaterialSlot);
+                            }
+                            else
+                            {
+                                // create material orb
+                                var currentMaterialSlot = currentParentSlot.AddSlot("Material: " + currentFileName);
+                                await CreateMaterialOrbFromVmt(firstVmtObject, currentMaterialSlot);
+                            }
                         }
                         else
                             Error($"Couldn't find {currentFileName} in vmt dictionary");
@@ -294,9 +312,19 @@ namespace Sledge2Resonite
                         Slot lutSlot;
                         try
                         {
-                            await default(ToWorld);
-                            lutSlot = currentParentSlot.AddSlot("LUT: " + currentFileName);
-                            await default(ToBackground);
+                            // create import slot if missing
+                            if (currentParentSlot == null)
+                            {
+                                await CreateImportSlot("LUT: " + currentFileName);
+                                lutSlot = importSlot;
+                            }
+                            else
+                            {
+                                await default(ToWorld);
+                                lutSlot = currentParentSlot.AddSlot("LUT: " + currentFileName);
+                                await default(ToBackground);
+
+                            }
                         }
                         catch (Exception ex)
                         {
