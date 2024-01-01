@@ -442,17 +442,8 @@ namespace Sledge2Resonite
                 Utils.SSBumpToNormal(currentTexture2D);
             }
 
-            ImageImporter.SetupTextureProxyComponents(
-                currentSlot,
-                currentTexture2D,
-                StereoLayout.None,
-                ImageProjection.Perspective,
-                false);
-            ImageImporter.CreateQuad(
-                currentSlot,
-                currentTexture2D,
-                StereoLayout.None,
-                true);
+            ImageImporter.SetupTextureProxyComponents(currentSlot, currentTexture2D, StereoLayout.None, ImageProjection.Perspective, false);
+            ImageImporter.CreateQuad(currentSlot, currentTexture2D, StereoLayout.None, true);
             currentSlot.AttachComponent<Grabbable>().Scalable.Value = true;
         }
 
