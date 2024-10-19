@@ -45,6 +45,8 @@ The mod will try to do an in place conversion and spawn the result in front of y
   * If disabled, only the first frame will be imported
 * SSBumpAutoConvert
   * Checks the image flags for "SSBump" and applies a conversion (see "Borrowed Code")
+* LUT import as linear
+    * import luts using the linear color profile
 
 ## Notes
 * Materials

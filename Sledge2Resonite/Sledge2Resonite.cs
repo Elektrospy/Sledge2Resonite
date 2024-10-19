@@ -21,7 +21,7 @@ namespace Sledge2Resonite
     {
         public override string Name => "Sledge2Resonite";
         public override string Author => "Elektrospy";
-        public override string Version => "0.1.0";
+        public override string Version => "0.1.1";
         public override string Link => "https://github.com/Elektrospy/Sledge2Resonite";
 
         internal static ModConfiguration config;
@@ -29,7 +29,7 @@ namespace Sledge2Resonite
         public override void DefineConfiguration(ModConfigurationDefinitionBuilder builder)
         {
             builder
-                .Version(new Version(0, 1, 0))
+                .Version(new Version(0, 1, 1))
                 .AutoSave(true);
         }
 
@@ -49,6 +49,9 @@ namespace Sledge2Resonite
 
         [AutoRegisterConfigKey]
         internal static ModConfigurationKey<bool> invertNormalmapG = new("Invert normal map G ", "Invert the green color channel of normal maps", () => true);
+
+        [AutoRegisterConfigKey]
+        internal static ModConfigurationKey<bool> lutAsLinear = new("Import lUT as linear ", "Import *.raw LUTs with a linear color profile", () => true);
 
         #endregion
 
@@ -386,10 +389,17 @@ namespace Sledge2Resonite
             && (currentVtfName.ToLower().Contains("_normal") || currentVtfName.ToLower().Contains("_bump")))
             {
                 currentTexture2D.IsNormalMap.Value = true;
-                // Source engine uses the DirectX standard for normal maps, NeosVR uses OpenGL
+                // Source engine uses the DirectX standard for normal maps, Resonite uses OpenGL
                 // so we need to invert the green channel
                 // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
-                currentTexture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
+                if (config.GetValue(Sledge2Resonite.invertNormalmapG))
+                {
+                    currentTexture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
+                }
+                else
+                {
+                    currentTexture2D.ProcessPixels((color c) => new color(c.r, c.g, c.b, c.a));
+                }
             }
 
             if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Ssbump) 
@@ -424,6 +434,7 @@ namespace Sledge2Resonite
             try
             {
                 var rawBytes = File.ReadAllBytes(path);
+                Debug($"read *.raw byte size: {rawBytes.Length} of {sourceLUTHeight * sourceLUTWidth}");
                 rawBitmap2D = new Bitmap2D(rawBytes, sourceLUTWidth, sourceLUTHeight, TextureFormat.RGB24, false, ColorProfile.Linear, false);
             }
             catch (Exception e)
@@ -448,12 +459,11 @@ namespace Sledge2Resonite
             // Going y axis from 0 to 31 + offset (0 to 1023 in steps of 32)
             for (int currentBlockIndex = 0; currentBlockIndex < pixelBoxSideLength; currentBlockIndex++)
             {
-                int rawYOffset = currentBlockIndex * pixelBoxSideLength;
                 for (int rawY = 0; rawY < pixelBoxSideLength; rawY++)
                 {
                     for (int rawX = 0; rawX < pixelBoxSideLength; rawX++)
                     {
-                        color rawPixelColor = rawBitmap2D.GetPixel(rawX, rawY + rawYOffset);
+                        color rawPixelColor = rawBitmap2D.GetPixel(rawX, rawY + (currentBlockIndex * pixelBoxSideLength));
                         texture.SetPixel(rawX, rawY, currentBlockIndex, in rawPixelColor);
                     }
                 }
@@ -471,10 +481,15 @@ namespace Sledge2Resonite
 
             var lutTex = targetSlot.AttachComponent<StaticTexture3D>();
             lutTex.URL.Value = uriTexture3D;
-            lutTex.FilterMode.Value = TextureFilterMode.Point;
+            lutTex.FilterMode.Value = TextureFilterMode.Anisotropic;
+            lutTex.AnisotropicLevel.Value = 16;
+            lutTex.DirectLoad.Value = true;
+            lutTex.PreferredFormat.Value = TextureCompression.RawRGBA;
+            lutTex.PreferredProfile.Value = Sledge2Resonite.config.GetValue(Sledge2Resonite.invertNormalmapG) ? ColorProfile.Linear : ColorProfile.sRGB;
 
             var lutMat = targetSlot.AttachComponent<LUT_Material>();
             lutMat.LUT.Target = lutTex;
+            lutMat.UseSRGB.Value = !Sledge2Resonite.config.GetValue(Sledge2Resonite.invertNormalmapG);
 
             MaterialOrb.ConstructMaterialOrb(lutMat, targetSlot);
         }

@@ -144,7 +144,7 @@ public abstract class PBSSpecularParser
                     break;
                 case "$normalmap":
                 case "$bumpmap":
-                    // Source engine uses the DirectX standard for normal maps, NeosVR uses OpenGL
+                    // Source engine uses the DirectX standard for normal maps, Resonite uses OpenGL
                     // So we need to invert the green channel
                     // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
                     normalmapBitmap = newBitmap;
@@ -155,6 +155,11 @@ public abstract class PBSSpecularParser
                     {
                         currentTexture2D.IsNormalMap.Value = true;
                         Utils.SSBumpToNormal(currentTexture2D);
+                    }
+
+                    if (Sledge2Resonite.config.GetValue(Sledge2Resonite.invertNormalmapG))
+                    {
+                        await currentTexture2D.InvertG();
                     }
 
                     currentTexture2D.IsNormalMap.Value = true;
