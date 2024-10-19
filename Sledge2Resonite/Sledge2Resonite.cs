@@ -21,7 +21,7 @@ namespace Sledge2Resonite
     {
         public override string Name => "Sledge2Resonite";
         public override string Author => "Elektrospy";
-        public override string Version => "0.1.1";
+        public override string Version => "0.1.2";
         public override string Link => "https://github.com/Elektrospy/Sledge2Resonite";
 
         internal static ModConfiguration config;
@@ -29,7 +29,7 @@ namespace Sledge2Resonite
         public override void DefineConfiguration(ModConfigurationDefinitionBuilder builder)
         {
             builder
-                .Version(new Version(0, 1, 1))
+                .Version(new Version(0, 1, 2))
                 .AutoSave(true);
         }
 
