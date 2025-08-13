@@ -21,7 +21,7 @@ namespace Sledge2Resonite
     {
         public override string Name => "Sledge2Resonite";
         public override string Author => "Elektrospy";
-        public override string Version => "0.1.2";
+        public override string Version => "0.2.1";
         public override string Link => "https://github.com/Elektrospy/Sledge2Resonite";
 
         internal static ModConfiguration config;
@@ -29,7 +29,7 @@ namespace Sledge2Resonite
         public override void DefineConfiguration(ModConfigurationDefinitionBuilder builder)
         {
             builder
-                .Version(new Version(0, 1, 2))
+                .Version(new Version(0, 2, 1))
                 .AutoSave(true);
         }
 
@@ -69,12 +69,68 @@ namespace Sledge2Resonite
             Engine.Current.RunPostInit(() => AssetPatch());
         }
 
-        private static void AssetPatch()
+        static void AssetPatch()
         {
+            /*
             var aExt = Traverse.Create(typeof(AssetHelper)).Field<Dictionary<AssetClass, List<string>>>("associatedExtensions");
             aExt.Value[AssetClass.Special].Add("vtf");
             aExt.Value[AssetClass.Special].Add("vmt");
             aExt.Value[AssetClass.Special].Add("raw");
+            */
+            // Revised implementation using reflection to handle API changes, *borrowed* from xLinka :)
+
+            try
+            {
+                Debug("Attempting to add vtf, vmt and raw support to import system");
+
+                // Get ImportExtension type via reflection since it's now a struct inside AssetHelper
+                var assHelperType = typeof(AssetHelper);
+                var importExtType = assHelperType.GetNestedType("ImportExtension", System.Reflection.BindingFlags.NonPublic);
+
+                if (importExtType == null)
+                {
+                    Error("ImportExtension type not found. This mod is toast.");
+                    return;
+                }
+
+                // Create ImportExtension instances with reflection
+                // Constructor args: (string ext, bool autoImport)
+                var importExtVTF = System.Activator.CreateInstance(importExtType, new object[] { "vtf", true });
+                var importExtVMT = System.Activator.CreateInstance(importExtType, new object[] { "vmt", true });
+                var importExtRAW = System.Activator.CreateInstance(importExtType, new object[] { "raw", true });
+
+                // Get the associatedExtensions field via reflection
+                var extensionsField = assHelperType.GetField("associatedExtensions",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+                if (extensionsField == null)
+                {
+                    Error("Could not find associatedExtensions field");
+                    return;
+                }
+
+                // Get the dictionary and add our extension to the Special asset class
+                var extensions = extensionsField.GetValue(null);
+                var dictType = extensions.GetType();
+                var specialValue = dictType.GetMethod("get_Item").Invoke(extensions, new object[] { AssetClass.Special });
+
+                if (specialValue == null)
+                {
+                    Error("Couldn't get Special asset class list");
+                    return;
+                }
+
+                // Add our ImportExtension to the list
+                specialValue.GetType().GetMethod("Add").Invoke(specialValue, new[] { importExtVTF });
+                specialValue.GetType().GetMethod("Add").Invoke(specialValue, new[] { importExtVMT });
+                specialValue.GetType().GetMethod("Add").Invoke(specialValue, new[] { importExtRAW });
+
+                Debug("vtf, vmt and raw import extensions added successfully");
+            }
+            catch (System.Exception ex)
+            {
+                Error($"Failed to add vtf, vmt and raw to special import formats: {ex}");
+            }
         }
 
         [HarmonyPatch(typeof(UniversalImporter), "ImportTask", typeof(AssetClass), typeof(IEnumerable<string>), typeof(World), typeof(float3), typeof(floatQ), typeof(float3), typeof(bool))]
@@ -97,7 +153,7 @@ namespace Sledge2Resonite
             }
         }
 
-        private static async Task ProcessSledgeImport(IEnumerable<string> inputFiles, World world)
+        static async Task ProcessSledgeImport(IEnumerable<string> inputFiles, World world)
         {
             await default(ToBackground);
             await ParseInputFiles(inputFiles, world, true);
@@ -105,8 +161,9 @@ namespace Sledge2Resonite
             await default(ToWorld);
         }
 
-        private static async Task ParseInputFiles(IEnumerable<string> inputFiles, World world, bool createQuads = false)
+        static async Task ParseInputFiles(IEnumerable<string> inputFiles, World world, bool createQuads = true)
         {
+            Msg($"ParseInputFiles");
             SerialisedObjectFormatter ValveSerialiser = new SerialisedObjectFormatter();
             string[] filesArr = inputFiles.ToArray();
             int vtfCounter = 0;
@@ -114,7 +171,9 @@ namespace Sledge2Resonite
 
             for (int i = 0; i < filesArr.Count(); ++i)
             {
+                Debug($"Does {filesArr[i]} exist?");
                 if (!File.Exists(filesArr[i])) continue;
+                Debug($"Yes it does!");
 
                 FileInfo currentFileInfo;
                 FileStream fs;
@@ -129,12 +188,12 @@ namespace Sledge2Resonite
                     continue;
                 }
 
-                string currentFileName = currentFileInfo.Name.Split('.').First();
+                string currentFileName = currentFileInfo.Name.Substring(0, currentFileInfo.Name.Length - 4);
                 string currentFileEnding = currentFileInfo.Extension;
                 switch (currentFileEnding)
                 {
                     case ".vtf":
-                        VtfFile tempVtf = new VtfFile(fs);
+                        VtfFile tempVtf = new(fs);
                         try
                         {
                             if (vtfDictionary.ContainsKey(currentFileName))
@@ -159,23 +218,29 @@ namespace Sledge2Resonite
                         }
                         catch (Exception e)
                         {
-                            Error($"Couldn't add Slot \"Texture: {currentFileName}\" to world, error: {e.Message}");
+                            Error($"Couldn't add Slot \"Texture: {currentFileName}\" to world, error: {e}");
                             continue;
                         }
 
                         // Check if this is the first time
-                        if (vtfCounter == 0)
+                        currentSlot.PositionInFrontOfUser();
+                        if (vtfCounter != 0)
                         {
-                            currentSlot.PositionInFrontOfUser();
-                        }
-                        else
-                        {
-                            currentSlot.PositionInFrontOfUser();
                             float3 offset = UniversalImporter.GridOffset(ref vtfCounter, config.GetValue(importTextureRow));
                             currentSlot.GlobalPosition += offset;
-                            vtfCounter++;
                         }
-                        await CreateTextureQuadFromVtf(currentFileName, tempVtf, currentSlot);
+                        vtfCounter++;
+                        Msg($"Call CreateTextureQuadFromVtf");
+                        try
+                        {
+                            await CreateTextureQuadFromVtf(currentFileName, tempVtf, currentSlot);
+                        }
+                        catch (Exception e)
+                        {
+                            Error($"Whoooops, you need to put the CD into your computer: {e}");
+                            continue;
+                        }
+                        Msg($"CreateTextureQuadFromVtf was called!");
                         break;
                     case ".vmt":
                         VMTPreprocessor vmtPrePros = new VMTPreprocessor();
@@ -219,7 +284,7 @@ namespace Sledge2Resonite
                                 string tempTexturePath = Utils.MergeTextureNameAndPath(currentProperty.Value, filesArr[i]);
 
                                 if (!string.IsNullOrEmpty(tempTexturePath))
-                                    await ParseInputFiles(new string[] { tempTexturePath }, world);
+                                    await ParseInputFiles(new string[] { tempTexturePath }, world, false);
                                 else
                                     Error("Texture path is empty or null!");
                             }
@@ -250,17 +315,13 @@ namespace Sledge2Resonite
                         }
 
                         // Check if this is the first time
-                        if (vtfCounter == 0)
+                        lutSlot.PositionInFrontOfUser();
+                        if (vtfCounter != 0)
                         {
-                            lutSlot.PositionInFrontOfUser();
-                        }
-                        else
-                        {
-                            lutSlot.PositionInFrontOfUser();
                             float3 offset = UniversalImporter.GridOffset(ref vtfCounter, config.GetValue(importTextureRow));
                             lutSlot.GlobalPosition += offset;
-                            vtfCounter++;
                         }
+                        vtfCounter++;
                         await NewLUTImport(filesArr[i], lutSlot);
                         break;
                     default:
@@ -275,7 +336,7 @@ namespace Sledge2Resonite
             await default(ToBackground);
         }
 
-        private static async Task CreateMaterialOrbFromVmt(string currentVmtName, SerialisedObject currentSerialisedObject)
+        static async Task CreateMaterialOrbFromVmt(string currentVmtName, SerialisedObject currentSerialisedObject)
         {
             if (string.IsNullOrEmpty(currentVmtName))
             {
@@ -291,140 +352,235 @@ namespace Sledge2Resonite
             await vertexLitGenericParser.ParseMaterial(currentSerialisedObject.Properties, currentVmtName);
         }
 
-        private static async Task CreateTextureQuadFromVtf(string currentVtfName, VtfFile currentVtf, Slot currentSlot)
+        static async Task CreateTextureQuadFromVtf(string currentVtfName, VtfFile currentVtf, Slot currentSlot)
         {
-            
+            Debug($"CreateTextureQuadFromVtf");
             await default(ToWorld);
-            currentSlot.PositionInFrontOfUser();
-            VtfImage currentVtfImage = currentVtf.Images.GetLast();
 
-            var newBitmap = new Bitmap2D(
-                currentVtfImage.GetBgra32Data(),
-                currentVtfImage.Width,
-                currentVtfImage.Height,
-                TextureFormat.BGRA32,
-                false,
-                ColorProfile.Linear,
-                false);
+            // Cache configuration values
+            bool shouldGenerateAtlas = config.GetValue(Sledge2Resonite.generateTextureAtlas);
+            bool shouldInvertNormalG = config.GetValue(Sledge2Resonite.invertNormalmapG);
+            bool shouldAutoConvertSSBump = config.GetValue(Sledge2Resonite.SSBumpAutoConvert);
+            string lowerVtfName = currentVtfName.ToLower();
+            var mipmapNumber = currentVtf.Images.Select(x => x.Mipmap).Distinct().Count();
+            var framesNumberRaw = currentVtf.Images.Count();
+            var framesNumber = framesNumberRaw / mipmapNumber;
 
-            if (config.GetValue(Sledge2Resonite.generateTextureAtlas))
+            Debug($"Processing VTF with {currentVtf.Images.Count} total images (including mipmaps)");
+
+
+            Bitmap2D newBitmap;
+            if (shouldGenerateAtlas && framesNumber > 1)
             {
-                var imageList = currentVtf.Images;
-                var mipmapNumber = currentVtf.Header.MipmapCount;
-                var framesNumberRaw = imageList.Count;
-                var framesNumber = framesNumberRaw / mipmapNumber;
-                var bytesNumber = currentVtfImage.Width * currentVtfImage.Height * 4 * framesNumber;
-                byte[] fillBytes = new byte[bytesNumber];
-
-                Msg($"Generate image atlas with {framesNumber} frames");
-                var newAtlasBitmap = new Bitmap2D(
-                    fillBytes,
-                    currentVtfImage.Width * framesNumber,
-                    currentVtfImage.Height,
-                    TextureFormat.BGRA32,
-                    false,
-                    ColorProfile.Linear,
-                    false);
-                Msg($"Generated atlas bitmap with Width: {newAtlasBitmap.Size.x} and Height: {newAtlasBitmap.Size.y}");
-
-                Msg($"Parse frames ...");
-                var frameIndexStartOffset = imageList.Count - framesNumber;
-                for (int currentFrame = frameIndexStartOffset; currentFrame < framesNumberRaw; currentFrame++)
-                {
-                    try
-                    {
-                        int currentOutputFrameIndex = currentFrame - frameIndexStartOffset;
-                        var currentFrameImage = imageList[currentFrame];
-
-                        var currentFrameBitmap = new Bitmap2D(
-                            currentFrameImage.GetBgra32Data(),
-                            currentFrameImage.Width,
-                            currentFrameImage.Height,
-                            TextureFormat.BGRA32,
-                            false,
-                            ColorProfile.Linear,
-                            false);
-
-                        for (int currentX = 0; currentX < currentFrameBitmap.Size.x; currentX++)
-                        {
-                            var pixelOffsetX = currentVtfImage.Width * currentOutputFrameIndex;
-                            for (int currentY = 0; currentY < currentFrameBitmap.Size.y; currentY++)
-                            {
-                                var rawPixelColor = currentFrameBitmap.GetPixel(currentX, currentY);
-                                newAtlasBitmap.SetPixel(currentX + pixelOffsetX, currentY, in rawPixelColor);
-                            }
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Error("Oh no, something bad happened, skipping to next frame: " + e.ToString());
-                    }
-                }
-                Msg($"... Frames parsing done");
-                newBitmap = newAtlasBitmap;
-            }
-
-
-            var currentUri = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(newBitmap);
-            StaticTexture2D currentTexture2D = currentSlot.AttachComponent<StaticTexture2D>();
-            currentTexture2D.URL.Value = currentUri;
-
-            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Pointsample))
-            {
-                currentTexture2D.FilterMode.Value = TextureFilterMode.Point;
-            }
-            else if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Trilinear))
-            {
-                currentTexture2D.FilterMode.Value = TextureFilterMode.Trilinear;
+                newBitmap = await CreateAtlasBitmapWithMipmaps(currentVtf, currentVtfName);
             }
             else
             {
-                currentTexture2D.FilterMode.Value = TextureFilterMode.Anisotropic;
-                currentTexture2D.AnisotropicLevel.Value = 8;
+                newBitmap = CreateSingleTextureWithMipmaps(currentVtf);
             }
 
-            // Check if normalmap flag is set and the name contains "_normal"
-            // Come textures contain "flawed" flags within the header
-            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Normal) 
-            && (currentVtfName.ToLower().Contains("_normal") || currentVtfName.ToLower().Contains("_bump")))
-            {
-                currentTexture2D.IsNormalMap.Value = true;
-                // Source engine uses the DirectX standard for normal maps, Resonite uses OpenGL
-                // so we need to invert the green channel
-                // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
-                if (config.GetValue(Sledge2Resonite.invertNormalmapG))
-                {
-                    currentTexture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
-                }
-                else
-                {
-                    currentTexture2D.ProcessPixels((color c) => new color(c.r, c.g, c.b, c.a));
-                }
-            }
+            // Save and setup texture
+            Msg($"Saving asset {currentVtfName} to local database");
+            var currentUri = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(newBitmap);
 
-            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Ssbump) 
-            && (currentVtfName.ToLower().Contains("_bump") || currentVtfName.ToLower().Contains("_ssbump")) 
-            && config.GetValue(Sledge2Resonite.SSBumpAutoConvert))
-            {
-                currentTexture2D.IsNormalMap.Value = true;
-                Utils.SSBumpToNormal(currentTexture2D);
-            }
+            Msg($"Attach component 'StaticTexture2D' to {currentSlot.Name}");
+            StaticTexture2D currentTexture2D = currentSlot.AttachComponent<StaticTexture2D>();
+            currentTexture2D.URL.Value = currentUri;
 
-            ImageImporter.SetupTextureProxyComponents(
-                currentSlot,
-                currentTexture2D,
-                StereoLayout.None,
-                ImageProjection.Perspective,
-                false);
-            ImageImporter.CreateQuad(
-                currentSlot,
-                currentTexture2D,
-                StereoLayout.None,
-                true);
-            currentSlot.AttachComponent<Grabbable>().Scalable.Value = true;
+            // Configure texture filtering
+            ConfigureTextureFiltering(currentTexture2D, currentVtf);
+
+            // Handle normal maps
+            await ProcessNormalMaps(currentTexture2D, currentVtf, lowerVtfName, shouldInvertNormalG);
+
+            // Handle SSBump conversion
+            ProcessSSBump(currentTexture2D, currentVtf, lowerVtfName, shouldAutoConvertSSBump);
+
+            // Setup final components
+            SetupFinalComponents(currentSlot, currentTexture2D);
         }
 
-        private static async Task NewLUTImport(string path, Slot targetSlot)
+        static Bitmap2D CreateSingleTextureWithMipmaps(VtfFile vtfFile)
+        {
+            Debug($"Creating single texture with mipmaps");
+
+            // Get the base mip level (largest image) for the first frame
+            VtfImage baseImage = vtfFile.Images.Last();
+            byte[] imageData = baseImage.GetBgra32Data();
+
+            Debug($"Using base mip level: {baseImage.Width}x{baseImage.Height}");
+
+            // Create bitmap with mipmap generation enabled
+            return new Bitmap2D(
+                imageData,
+                baseImage.Width,
+                baseImage.Height,
+                TextureFormat.BGRA32,
+                false, // Generate mipmaps automatically
+                ColorProfile.sRGB,
+                false, // Don't flip Y
+                "VTF" // Original format identifier
+            );
+        }
+
+        static async Task<Bitmap2D> CreateAtlasBitmapWithMipmaps(VtfFile vtfFile, string vtfName)
+        {
+            Debug($"Creating atlas bitmap with mipmaps");
+
+            // Calculate mipmap count by analyzing the image collection
+            // Since MipmapCount is no longer public, we need to determine it ourselves
+            int mipmapLevels = vtfFile.Images.Select(x => x.Mipmap).Distinct().Count();
+            int totalImages = vtfFile.Images.Count;
+            int frameCount = totalImages / Math.Max(1, mipmapLevels);
+
+            Debug($"Atlas info: {frameCount} frames, {mipmapLevels} mipmap levels each (calculated)");
+
+            if (frameCount <= 1 || mipmapLevels <= 1)
+            {
+                return CreateSingleTextureWithMipmaps(vtfFile);
+            }
+
+            // Get base image dimensions from the largest image
+            VtfImage baseImage = vtfFile.Images.Last();
+            int baseWidth = baseImage.Width;
+            int baseHeight = baseImage.Height;
+
+            Debug($"Base image dimensions: {baseWidth}x{baseHeight}");
+
+            // Create atlas using the highest quality images
+            const int colorChannels = 4;
+            int atlasWidth = baseWidth * frameCount;
+            int atlasSize = atlasWidth * baseHeight * colorChannels;
+            byte[] atlasData = new byte[atlasSize];
+
+            // Copy each frame's highest quality image to the atlas
+            await CopyFramesToAtlas(vtfFile, frameCount, mipmapLevels, baseWidth, baseHeight, atlasData);
+
+            // Create the final atlas bitmap using the highest quality images
+            return new Bitmap2D(
+                atlasData,
+                atlasWidth,
+                baseHeight,
+                TextureFormat.BGRA32,
+                false, // Let Resonite generate mipmaps from our high-quality atlas
+                ColorProfile.sRGB,
+                false, // Don't flip Y
+                "VTF_Atlas" // Original format identifier
+            );
+        }
+
+        static async Task CopyFramesToAtlas(VtfFile vtfFile, int frameCount, int mipmapLevels,
+            int frameWidth, int frameHeight, byte[] atlasData)
+        {
+            unsafe
+            {
+                fixed (byte* atlasPtr = atlasData)
+                {
+                    // Find all images that match our base resolution (these are the highest quality frames)
+                    var baseImages = vtfFile.Images
+                        .Where(img => img.Width == frameWidth && img.Height == frameHeight)
+                        .Take(frameCount)
+                        .ToList();
+
+                    Debug($"Found {baseImages.Count} base resolution images for atlas");
+
+                    for (int frame = 0; frame < Math.Min(frameCount, baseImages.Count); frame++)
+                    {
+                        try
+                        {
+                            VtfImage frameImage = baseImages[frame];
+                            byte[] frameData = frameImage.GetBgra32Data();
+
+                            fixed (byte* framePtr = frameData)
+                            {
+                                int frameOffsetBytes = frame * frameWidth * 4;
+                                int atlasStride = frameWidth * frameCount * 4;
+                                int frameStride = frameWidth * 4;
+
+                                // Copy row by row
+                                for (int y = 0; y < frameHeight; y++)
+                                {
+                                    byte* srcRow = framePtr + (y * frameStride);
+                                    byte* dstRow = atlasPtr + (y * atlasStride) + frameOffsetBytes;
+
+                                    Buffer.MemoryCopy(srcRow, dstRow, frameStride, frameStride);
+                                }
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            Error($"Error copying frame {frame} to atlas: {e}");
+                        }
+                    }
+                }
+            }
+        }
+
+        static void ConfigureTextureFiltering(StaticTexture2D texture2D, VtfFile vtfFile)
+        {
+            if (vtfFile.Header.Flags.HasFlag(VtfImageFlag.PointSample))
+            {
+                texture2D.FilterMode.Value = TextureFilterMode.Point;
+            }
+            else if (vtfFile.Header.Flags.HasFlag(VtfImageFlag.Trilinear))
+            {
+                texture2D.FilterMode.Value = TextureFilterMode.Trilinear;
+            }
+            else
+            {
+                texture2D.FilterMode.Value = TextureFilterMode.Anisotropic;
+                texture2D.AnisotropicLevel.Value = 8;
+            }
+        }
+
+        static async Task ProcessNormalMaps(StaticTexture2D texture2D, VtfFile vtfFile,
+            string lowerVtfName, bool shouldInvertNormalG)
+        {
+            if (vtfFile.Header.Flags.HasFlag(VtfImageFlag.Normal)
+                && (lowerVtfName.Contains("_normal") || lowerVtfName.Contains("_bump")))
+            {
+                texture2D.IsNormalMap.Value = true;
+
+                if (shouldInvertNormalG)
+                {
+                    await texture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
+                }
+            }
+        }
+
+        static void ProcessSSBump(StaticTexture2D texture2D, VtfFile vtfFile,
+            string lowerVtfName, bool shouldAutoConvertSSBump)
+        {
+            if (shouldAutoConvertSSBump
+                && vtfFile.Header.Flags.HasFlag(VtfImageFlag.SsBump)
+                && (lowerVtfName.Contains("_ssbump") || lowerVtfName.Contains("_bump")))
+            {
+                texture2D.IsNormalMap.Value = true;
+                Utils.SSBumpToNormal(texture2D);
+            }
+        }
+
+        static void SetupFinalComponents(Slot slot, StaticTexture2D texture2D)
+        {
+            ImageImporter.SetupTextureProxyComponents(
+                slot,
+                texture2D,
+                StereoLayout.None,
+                ImageProjection.Perspective,
+                false
+            );
+
+            ImageImporter.CreateQuad(
+                slot,
+                texture2D,
+                StereoLayout.None,
+                true
+            );
+
+            slot.AttachComponent<Grabbable>().Scalable.Value = true;
+        }
+
+        static async Task NewLUTImport(string path, Slot targetSlot)
         {
             await new ToBackground();
             const int sourceLUTWidth = 32;
@@ -433,7 +589,7 @@ namespace Sledge2Resonite
             Bitmap2D rawBitmap2D = null;
             try
             {
-                var rawBytes = File.ReadAllBytes(path);
+                byte[] rawBytes = File.ReadAllBytes(path);
                 Debug($"read *.raw byte size: {rawBytes.Length} of {sourceLUTHeight * sourceLUTWidth}");
                 rawBitmap2D = new Bitmap2D(rawBytes, sourceLUTWidth, sourceLUTHeight, TextureFormat.RGB24, false, ColorProfile.Linear, false);
             }
@@ -451,7 +607,7 @@ namespace Sledge2Resonite
             Debug("Bitmap2D has a valid resolution");
 
             const int pixelBoxSideLength = 32;
-            var texture = new Bitmap3D(pixelBoxSideLength, pixelBoxSideLength, pixelBoxSideLength, TextureFormat.RGB24, false, ColorProfile.Linear);
+            Bitmap3D texture = new Bitmap3D(pixelBoxSideLength, pixelBoxSideLength, pixelBoxSideLength, TextureFormat.RGB24, false, ColorProfile.Linear);
 
             // This is dark got-dayum magic. Elektro somehow got this to work, I don't know how many hours we threw at this.
             // Converting our .raws to .pngs alone was a royal pain in the ass. Good riddance -dfg
@@ -494,13 +650,13 @@ namespace Sledge2Resonite
             MaterialOrb.ConstructMaterialOrb(lutMat, targetSlot);
         }
 
-        private static void ClearDictionaries()
+        static void ClearDictionaries()
         {
             vmtDictionary.Clear();
             vtfDictionary.Clear();
         }
 
-        private static async Task UpdateProgressAsync(IProgressIndicator indicator, string progressInfo, string detailInfo)
+        static async Task UpdateProgressAsync(IProgressIndicator indicator, string progressInfo, string detailInfo)
         {
             await default(ToWorld);
             indicator.UpdateProgress(0f, progressInfo, detailInfo);

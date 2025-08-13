@@ -1,86 +1,103 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-	
-    <PropertyGroup>
-	    <AppName>Resonite</AppName>
-	    <ModLoaderShort>rml</ModLoaderShort>
-	
-        <ProjectGuid>{10B25A97-00B6-449B-BF50-3C345E055CDA}</ProjectGuid>
-
-        <OutputType>Library</OutputType>
-        <AppDesignerFolder>Properties</AppDesignerFolder>
-        <RootNamespace>Sledge2Resonite</RootNamespace>
-        <AssemblyTitle>Sledge2$(AppName)</AssemblyTitle>
-        <AssemblyName>Sledge2$(AppName)</AssemblyName>
-        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-        <TargetFramework>net472</TargetFramework>
-        <LangVersion>preview</LangVersion>
-        <FileAlignment>512</FileAlignment>
-        <Deterministic>true</Deterministic>
-	
-	    <AppPath>$(MSBuildThisFileDirectory)$(AppName)</AppPath>
-        <AppPath Condition="Exists('E:\Programs\Steam\steamapps\common\$(AppName)')">E:\Programs\Steam\steamapps\common\$(AppName)\</AppPath>
-        <AppPath Condition="Exists('E:\SteamLibrary\steamapps\common\$(AppName)')">E:\SteamLibrary\steamapps\common\$(AppName)\</AppPath>
-        <AppPath Condition="Exists('$(HOME)/.steam/steam/steamapps/common/$(AppName)/')">$(HOME)/.steam/steam/steamapps/common/$(AppName)/</AppPath>
-        <AppPath Condition="Exists('C:\Program Files (x86)\Steam\steamapps\common\$(AppName)\')">C:\Program Files (x86)\Steam\steamapps\common\$(AppName)\</AppPath>
-
-        <AppData Condition="Exists('$(AppPath)$(AppName)_Data')">$(AppPath)$(AppName)_Data\Managed\</AppData>
-
-        <AlternateDataPath>$(AppPath)\Alt\</AlternateDataPath>
-        <AlternateDataPath Condition="Exists('$(AppPath)')">$(AppPath)_altData</AlternateDataPath>
-
-        <CopyLocal>false</CopyLocal>
-        <CopyToMods Condition="'$(CopyToMods)'==''">true</CopyToMods>
-        <DebugSymbols Condition="'$(Configuration)'=='Release'">false</DebugSymbols>
-        <DebugType Condition="'$(Configuration)'=='Release'">None</DebugType>
-        <Title>Sledge2Resonite</Title>
-        <PackageProjectUrl>https://github.com/Elektrospy/Sledge2Resonite</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/Elektrospy/Sledge2Resonite</RepositoryUrl>
-    </PropertyGroup>
-  
-    <ItemGroup>
-        <None Include="..\README.md" Link="README.md" />
-        <None Include="..\LICENSE" Link="License" />
-        <None Include="Properties\launchSettings.json" />
-    </ItemGroup>
-  
-    <ItemGroup>
-      <ProjectReference Include="..\sledge-formats\Sledge.Formats.Texture\Sledge.Formats.Texture.csproj" />
-      <ProjectReference Include="..\sledge-formats\Sledge.Formats\Sledge.Formats.csproj" />
-    </ItemGroup>
-  
-    <ItemGroup>
-        <Reference Include="HarmonyLib">
-            <HintPath>$(AppPath)$(ModLoaderShort)_libs\0Harmony.dll</HintPath>
-            <HintPath Condition="Exists('$(AppPath)0Harmony.dll')">$(AppPath)0Harmony.dll</HintPath>
-        </Reference>
-        <Reference Include="Elements.Core">
-            <HintPath>$(AppData)Elements.Core.dll</HintPath>
-        </Reference>
-	    <Reference Include="Elements.Assets">
-		    <HintPath>$(AppData)Elements.Assets.dll</HintPath>
-	    </Reference>
-        <Reference Include="FrooxEngine">
-            <HintPath>$(AppData)FrooxEngine.dll</HintPath>
-        </Reference>
-        <Reference Include="FrooxEngine">
-            <HintPath>$(AppData)FrooxEngine.Store.dll</HintPath>
-        </Reference>
-	    <Reference Include="UnityEngine">
-		    <HintPath>$(AppData)UnityEngine.dll</HintPath>
-	    </Reference>
-        <Reference Include="$(AppName)ModLoader">
-            <HintPath>$(AppPath)$(AppName)ModLoader.dll</HintPath>
-            <HintPath>$(AppPath)Libraries\$(AppName)ModLoader.dll</HintPath>
-        </Reference>
-        <Reference Include="System.Memory">
-            <HintPath>$(AppData)System.Memory.dll</HintPath>
-        </Reference>
-	    <Reference Include="System" />
-    </ItemGroup>
-  
-    <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(CopyToMods)'=='true'">
-        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(AppPath)$(ModLoaderShort)_mods" />
-        <Message Text="Copied $(TargetFileName) to $(AppPath)$(ModLoaderShort)_mods" Importance="high" />
-    </Target>
-	
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AppName>Resonite</AppName>
+    <ModLoaderShort>rml</ModLoaderShort>
+    <ProjectGuid>{10B25A97-00B6-449B-BF50-3C345E055CDA}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Sledge2Resonite</RootNamespace>
+    <AssemblyTitle>Sledge2$(AppName)</AssemblyTitle>
+    <AssemblyName>Sledge2$(AppName)</AssemblyName>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <AppPath>$(MSBuildThisFileDirectory)$(AppName)</AppPath>
+    <AppPath Condition="Exists('E:\Programs\Steam\steamapps\common\$(AppName)')">E:\Programs\Steam\steamapps\common\$(AppName)\</AppPath>
+    <AppPath Condition="Exists('E:\SteamLibrary\steamapps\common\$(AppName)')">E:\SteamLibrary\steamapps\common\$(AppName)\</AppPath>
+    <AppPath Condition="Exists('$(HOME)/.steam/steam/steamapps/common/$(AppName)/')">$(HOME)/.steam/steam/steamapps/common/$(AppName)/</AppPath>
+    <AppPath Condition="Exists('C:\Program Files (x86)\Steam\steamapps\common\$(AppName)\')">C:\Program Files (x86)\Steam\steamapps\common\$(AppName)\</AppPath>
+    <AppData Condition="Exists('$(AppPath)$(AppName)_Data')">$(AppPath)$(AppName)_Data\Managed\</AppData>
+    <AlternateDataPath>$(AppPath)\Alt\</AlternateDataPath>
+    <AlternateDataPath Condition="Exists('$(AppPath)')">$(AppPath)_altData</AlternateDataPath>
+    <CopyLocal>false</CopyLocal>
+    <CopyToMods Condition="'$(CopyToMods)'==''">true</CopyToMods>
+    <DebugSymbols Condition="'$(Configuration)'=='Release'">false</DebugSymbols>
+    <DebugType Condition="'$(Configuration)'=='Release'">None</DebugType>
+    <Title>Sledge2Resonite</Title>
+    <PackageProjectUrl>https://github.com/Elektrospy/Sledge2Resonite</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Elektrospy/Sledge2Resonite</RepositoryUrl>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\README.md" Link="README.md" />
+    <None Include="..\LICENSE" Link="License" />
+    <None Include="Properties\launchSettings.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\sledge-formats\Sledge.Formats.Texture\Sledge.Formats.Texture.csproj" />
+    <ProjectReference Include="..\sledge-formats\Sledge.Formats\Sledge.Formats.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="HarmonyLib">
+      <HintPath>$(AppPath)$(ModLoaderShort)_libs\0Harmony.dll</HintPath>
+      <HintPath Condition="Exists('$(AppPath)0Harmony.dll')">$(AppPath)0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="Elements.Core">
+      <HintPath>$(AppData)Elements.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Elements.Assets">
+      <HintPath>$(AppData)Elements.Assets.dll</HintPath>
+    </Reference>
+    <Reference Include="FrooxEngine">
+      <HintPath>$(AppData)FrooxEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="FrooxEngine">
+      <HintPath>$(AppData)FrooxEngine.Store.dll</HintPath>
+    </Reference>
+    <Reference Include="Sledge.Formats">
+      <HintPath>..\sledge-formats\Sledge.Formats.Texture\bin\Release\netstandard2.0\Sledge.Formats.dll</HintPath>
+    </Reference>
+    <Reference Include="Sledge.Formats.Texture">
+      <HintPath>..\sledge-formats\Sledge.Formats.Texture\bin\Release\netstandard2.0\Sledge.Formats.Texture.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(AppData)UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="$(AppName)ModLoader">
+      <HintPath>$(AppPath)$(AppName)ModLoader.dll</HintPath>
+      <HintPath>$(AppPath)Libraries\$(AppName)ModLoader.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Memory">
+      <HintPath>$(AppData)System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Content Include="Sledge2Resonite.cs" />
+    <Content Include="Preprocessor\Preprocessor.cs" />
+    <Content Include="Preprocessor\VMTPreprocessor.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Numerics.Vectors" Version="4.6.1" />
+  </ItemGroup>
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(CopyToMods)'=='true'">
+	  <!-- Copy the main assembly -->
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(AppPath)$(ModLoaderShort)_mods" />
+    <Message Text="Copied $(TargetFileName) to $(AppPath)$(ModLoaderShort)_mods" Importance="high" />
+	<!-- Copy Sledge.Formats.dll -->
+	<Copy SourceFiles="..\sledge-formats\Sledge.Formats.Texture\bin\Release\netstandard2.0\Sledge.Formats.dll"
+		DestinationFolder="$(AppPath)$(ModLoaderShort)_mods"
+		Condition="Exists('..\sledge-formats\Sledge.Formats.Texture\bin\Release\netstandard2.0\Sledge.Formats.dll')" />
+	<Message Text="Copied Sledge.Formats.dll to $(AppPath)$(ModLoaderShort)_mods"
+			Importance="high"
+			Condition="Exists('..\sledge-formats\Sledge.Formats.Texture\bin\Release\netstandard2.0\Sledge.Formats.dll')" />
+	<!-- Copy Sledge.Formats.Texture.dll -->
+	<Copy SourceFiles="..\sledge-formats\Sledge.Formats.Texture\bin\Release\netstandard2.0\Sledge.Formats.Texture.dll"
+		DestinationFolder="$(AppPath)$(ModLoaderShort)_mods"
+		Condition="Exists('..\sledge-formats\Sledge.Formats.Texture\bin\Release\netstandard2.0\Sledge.Formats.Texture.dll')" />
+	<Message Text="Copied Sledge.Formats.Texture.dll to $(AppPath)$(ModLoaderShort)_mods"
+			Importance="high"
+			Condition="Exists('..\sledge-formats\Sledge.Formats.Texture\bin\Release\netstandard2.0\Sledge.Formats.Texture.dll')" />
+  </Target>
 </Project>

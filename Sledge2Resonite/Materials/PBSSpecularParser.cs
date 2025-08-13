@@ -42,6 +42,7 @@ namespace Sledge2Resonite;
 /// "$normalmapalphaenvmapmask" "1" -> The normal map contains a specular map in its alpha channel
 /// "$normalalphaenvmapmask" "1" -> common typo of the same setting
 /// "$envmapmaskintintmasktexture" "1" -> Use the red channel of the $tintmasktexture as the specular mask.
+/// "$specmap_texture" "some/path/texturename" -> Specular texture, used with special shader for Black Mesa (Blue Shift)
 /// --- Emission ---
 /// "$selfillum" "1" -> Material is emissive, use albedo texture with blacked out background if "$selfillummask" is not set
 /// "$selfillum_envmapmask_alpha" "1" -> replaces the original "$selfillum" command
@@ -64,7 +65,7 @@ namespace Sledge2Resonite;
 /// using regions :(
 /// </remarks>
 /// <see cref="https://developer.valvesoftware.com/wiki/Category:List_of_Shader_Parameters"/>
-/// 
+///
 
 // TODO: fails specular creation on securitystation_bits.vmt -> inside normalmap
 
@@ -72,7 +73,7 @@ public abstract class PBSSpecularParser
 {
     protected readonly HashSet<string> propertyTextureNamesHashSet = new HashSet<string>()
     {
-        "$basetexture", "$detail", "$normalmap", "$bumpmap", "$heightmap", "$envmapmask, $ambientoccltexture"
+        "$basetexture", "$detail", "$normalmap", "$bumpmap", "$heightmap", "$envmapmask, $ambientoccltexture", "$specmap_texture"
     };
 
     protected readonly HashSet<char> multiValueEncloseCharHashset = new HashSet<char>()
@@ -111,14 +112,14 @@ public abstract class PBSSpecularParser
             }
 
             // VTF contains mip-maps, but we only care about the last original image
-            VtfImage currentVtfImage = currentVtf.Images.GetLast();
+            VtfImage currentVtfImage = currentVtf.Images.Last();
             var newBitmap = new Bitmap2D(currentVtfImage.GetBgra32Data(), currentVtfImage.Width, currentVtfImage.Height, TextureFormat.BGRA32, false, ColorProfile.Linear, false);
             await default(ToWorld);
             StaticTexture2D currentTexture2D = currentSlot.AttachComponent<StaticTexture2D>();
             currentTexture2D.URL.Value = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(newBitmap);
 
             // Assign texture filtering based on flags in header
-            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Pointsample))
+            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.PointSample))
             {
                 currentTexture2D.FilterMode.Value = TextureFilterMode.Point;
             }
@@ -149,7 +150,7 @@ public abstract class PBSSpecularParser
                     // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
                     normalmapBitmap = newBitmap;
                     // TODO: add green channel invert again
-                    if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Ssbump)
+                    if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.SsBump)
                     && (currentTextureName.ToLower().Contains("_bump") || currentTextureName.ToLower().Contains("_ssbump"))
                     && Sledge2Resonite.config.GetValue(Sledge2Resonite.SSBumpAutoConvert))
                     {
@@ -202,15 +203,15 @@ public abstract class PBSSpecularParser
                 {
                     // Copy texture and invert alpha channel for specular
                     await default(ToBackground);
-                    var albMap = tempAlbedoBitmap2D.Images.GetLast();
+                    var albMap = tempAlbedoBitmap2D.Images.Last();
                     var albMapRaw = albMap.GetBgra32Data();
                     var newSpecularBitmap = new Bitmap2D(
                         albMapRaw,
                         albMap.Width,
                         albMap.Height,
                         TextureFormat.BGRA32,
-                        false, 
-                        ColorProfile.Linear, 
+                        false,
+                        ColorProfile.Linear,
                         false);
 
                     // Wait for the world to catch up
@@ -227,9 +228,16 @@ public abstract class PBSSpecularParser
 
     private async Task<PBS_Specular> CreateSpecularFromSpecularMap(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary, Slot currentSlot)
     {
-        if (propertiesDictionary.TryGetValue("$envmapmask", out string currentEnvmapmask) &&
+        string currentEnvmapmask;
+        if ((propertiesDictionary.TryGetValue("$envmapmask", out currentEnvmapmask) ||
+            propertiesDictionary.TryGetValue("$specmap_texture", out currentEnvmapmask)) &&
                     propertiesDictionary.TryGetValue("$basetexture", out string specularAlbedo))
         {
+            if (specularAlbedo == null || currentEnvmapmask == null)
+            {
+                return currentMaterial;
+            }
+
             string currentEnvmapmaskName = currentEnvmapmask.Split('/').Last();
             string currentAlbedoName = specularAlbedo.Split('/').Last();
 
@@ -237,8 +245,8 @@ public abstract class PBSSpecularParser
                 Sledge2Resonite.vtfDictionary.TryGetValue(currentAlbedoName, out var tempAlbedoBitmap2D))
             {
                 await default(ToBackground);
-                var albMap = tempAlbedoBitmap2D.Images.GetLast();
-                var envMap = tempEnvMapBitmap2D.Images.GetLast();
+                var albMap = tempAlbedoBitmap2D.Images.Last();
+                var envMap = tempEnvMapBitmap2D.Images.Last();
                 var albMapModified = albMap.GetBgra32Data();
                 var envMapModified = envMap.GetBgra32Data();
                 for (int x = 0; x < envMapModified.Length; x += 4)
@@ -285,7 +293,7 @@ public abstract class PBSSpecularParser
                     await default(ToBackground);
 
                     // Copy texture and invert alpha channel for specular
-                    var albMap = tempAlbedoBitmap2D.Images.GetLast();
+                    var albMap = tempAlbedoBitmap2D.Images.Last();
                     var albMapRaw = albMap.GetBgra32Data();
 
                     // Create new specular bitmap from copying the normalmap alpha into the albedo alpha
@@ -349,7 +357,7 @@ public abstract class PBSSpecularParser
 
     private async Task<PBS_Specular> CreateEmissionMap(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary, Slot currentSlot)
     {
-        // Create emission texture 
+        // Create emission texture
         if (propertiesDictionary.TryGetValue("$selfillum", out string currentSelfIllum) &&
             propertiesDictionary.TryGetValue("$basetexture", out string emissionAlbedo))
         {
@@ -360,7 +368,7 @@ public abstract class PBSSpecularParser
                 await default(ToBackground);
 
                 // Add new emission texture to world and tint background black
-                var albMap = tempAlbedoBitmap2D.Images.GetLast();
+                var albMap = tempAlbedoBitmap2D.Images.Last();
                 var albMapRaw = albMap.GetBgra32Data();
                 var newEmission = new Bitmap2D(albMapRaw, albMap.Width, albMap.Height, TextureFormat.BGRA32, false, ColorProfile.Linear, false);
 
@@ -470,7 +478,7 @@ public abstract class PBSSpecularParser
         else if (Sledge2Resonite.vtfDictionary.TryGetValue(currentSpecularTint, out var currentSpecularMapTexture))
         {
             // Copy texture and invert alpha channel for specular
-            var specMap = currentSpecularMapTexture.Images.GetLast();
+            var specMap = currentSpecularMapTexture.Images.Last();
             var specMapRaw = specMap.GetBgra32Data();
 
             // Create new specular bitmap from copying the normalmap alpha into the albedo alpha
@@ -559,3 +567,4 @@ public abstract class PBSSpecularParser
     }
 
 }
+

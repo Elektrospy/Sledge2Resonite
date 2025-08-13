@@ -3,13 +3,13 @@ using System;
 
 namespace Sledge2Resonite;
 
-public class VMTPreprocessor : Preprocessor
-{
-    public bool ParseVmt(string input, out string parsedFile)
+    public class VMTPreprocessor : Preprocessor
     {
-        try
+    public bool ParseVmt(string input, out string parsedFile)
         {
-            input = input.ToLower();
+            try
+            {
+                input = input.ToLower();
 
             if (!Preprocess(input))
             {
@@ -30,11 +30,11 @@ public class VMTPreprocessor : Preprocessor
             return true;
         }
         catch (Exception ex)
-        {
-            UniLog.Error($"ParseVmt failed with error: {ex.Message}");    
+            {
+                UniLog.Error($"ParseVmt failed with error: {ex.Message}");
             parsedFile = string.Empty;
-        }
+            }
 
-        return false;
+            return false;
     }
 }

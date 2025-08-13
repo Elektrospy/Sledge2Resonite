@@ -1,13 +1,16 @@
 ﻿using Elements.Core;
 using Sledge2Resonite;
 using System.Globalization;
-using System.Text.RegularExpressions;
 
-var text = File.ReadAllText(@"Material.txt");
-VMTPreprocessor pro = new VMTPreprocessor();
-pro.ParseVmt(text, out string result);
+internal class Program
+{
+    private static void Main(string[] args)
+    {
+        var text = File.ReadAllText(@"Material.txt");
+        VMTPreprocessor pro = new VMTPreprocessor();
+        pro.ParseVmt(text, out string result);
 
-string[] testStringList = {
+        string[] testStringList = {
     "{128 255 16}",
     "{ 128 255 16}",
     "{128 255 16 }",
@@ -44,12 +47,13 @@ string[] testStringList = {
 };
 
 
-NumberFormatInfo nfi = new NumberFormatInfo();
-nfi.NumberDecimalSeparator = ".";
+        NumberFormatInfo nfi = new NumberFormatInfo();
+        nfi.NumberDecimalSeparator = ".";
 
-for (int i=0; i<testStringList.Length; i++)
-{
-    Float3Extensions.GetFloat3FromString(testStringList[i], out float3 output);
-    Console.WriteLine($"{i}: {output.x.ToString(nfi)} {output.y.ToString(nfi)} {output.z.ToString(nfi)}\n");
+        for (int i = 0; i < testStringList.Length; i++)
+        {
+            Float3Extensions.GetFloat3FromString(testStringList[i], out float3 output);
+            Console.WriteLine($"{i}: {output.x.ToString(nfi)} {output.y.ToString(nfi)} {output.z.ToString(nfi)}\n");
+        }
+    }
 }
-
