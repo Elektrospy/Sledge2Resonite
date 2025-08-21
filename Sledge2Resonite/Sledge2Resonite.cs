@@ -1,6 +1,8 @@
 ﻿using Elements.Core;
 using Elements.Assets;
 using FrooxEngine;
+using FrooxEngine.Undo;
+using Renderite.Shared;
 using HarmonyLib;
 using ResoniteModLoader;
 using Sledge.Formats.Valve;
@@ -12,8 +14,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using File = System.IO.File;
-using FrooxEngine.Undo;
-using TextureFormat = Elements.Assets.TextureFormat;
 
 namespace Sledge2Resonite
 {
@@ -21,7 +21,7 @@ namespace Sledge2Resonite
     {
         public override string Name => "Sledge2Resonite";
         public override string Author => "Elektrospy";
-        public override string Version => "0.2.1";
+        public override string Version => "0.3.0";
         public override string Link => "https://github.com/Elektrospy/Sledge2Resonite";
 
         internal static ModConfiguration config;
@@ -29,7 +29,7 @@ namespace Sledge2Resonite
         public override void DefineConfiguration(ModConfigurationDefinitionBuilder builder)
         {
             builder
-                .Version(new Version(0, 2, 1))
+                .Version(new Version(0, 3, 0))
                 .AutoSave(true);
         }
 

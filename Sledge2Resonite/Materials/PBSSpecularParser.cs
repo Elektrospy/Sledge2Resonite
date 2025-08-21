@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using TextureFormat = Elements.Assets.TextureFormat;
+using Renderite.Shared;
 
 namespace Sledge2Resonite;
 
@@ -33,6 +33,7 @@ namespace Sledge2Resonite;
 /// "$AmbientOcclusion" "1" -> Controls strength of Ambient Occlusion. (1 = fully enabled, 0 = fully disabled)
 /// --- Height map ---
 /// "$heightmap" "some/path/texturename" -> Height map texture
+/// "$POMSCALE" ".01" -> Height map scale
 /// --- Specular map ---
 /// "$envmapmask" "some/path/texturename" -> Specular texture
 /// "$envmaptint" "[1 1 1]" -> Specular color tint(RGB format)
@@ -186,6 +187,7 @@ public abstract class PBSSpecularParser
         currentMaterial = await SetSpecularColor(currentMaterial, propertiesDictionary);
         currentMaterial = await SetSpecularMapTint(currentMaterial, propertiesDictionary, currentSlot);
         currentMaterial = await SetTextureTransforms(currentMaterial, propertiesDictionary);
+        currentMaterial = await SetTextureHeightMapScale(currentMaterial, propertiesDictionary);
 
         return currentMaterial;
     }
@@ -530,6 +532,20 @@ public abstract class PBSSpecularParser
                 }
             }
 
+            await default(ToBackground);
+        }
+
+        return currentMaterial;
+    }
+
+    private async Task<PBS_Specular> SetTextureHeightMapScale(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary)
+    {
+        // Apply height map texture scale
+        if (propertiesDictionary.TryGetValue("$pomscale", out string currentHeightScale) &&
+                float.TryParse(currentHeightScale, NumberStyles.Number, CultureInfo.InvariantCulture, out float parsed))
+        {
+            await default(ToWorld);
+            currentMaterial.HeightScale.Value = parsed;
             await default(ToBackground);
         }
 
