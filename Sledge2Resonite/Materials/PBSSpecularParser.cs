@@ -89,7 +89,7 @@ public abstract class PBSSpecularParser
         currentSlot.PositionInFrontOfUser();
         var currentMaterial = currentSlot.CreateMaterialOrb<PBS_Specular>();
         await default(ToBackground);
-
+        // temp texture for extracting specular map later on
         Bitmap2D normalmapBitmap = null;
 
         foreach (KeyValuePair<string, string> currentProperty in properties)
@@ -135,7 +135,6 @@ public abstract class PBSSpecularParser
             }
 
             // It is assumed that there will be at least one
-            await default(ToWorld);
             switch (currentProperty.Key)
             {
                 case "$basetexture":
@@ -146,16 +145,16 @@ public abstract class PBSSpecularParser
                     break;
                 case "$normalmap":
                 case "$bumpmap":
+                    currentTexture2D.IsNormalMap.Value = true;
+                    currentMaterial.NormalMap.Target = currentTexture2D;
+                    normalmapBitmap = newBitmap; // copy to temp texture
                     // Source engine uses the DirectX standard for normal maps, Resonite uses OpenGL
                     // So we need to invert the green channel
                     // DirectX is referred as Y- (top-down), OpenGL is referred as Y+ (bottom-up)
-                    normalmapBitmap = newBitmap;
-                    // TODO: add green channel invert again
                     if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.SsBump)
                     && (currentTextureName.ToLower().Contains("_bump") || currentTextureName.ToLower().Contains("_ssbump"))
                     && Sledge2Resonite.config.GetValue(Sledge2Resonite.SSBumpAutoConvert))
                     {
-                        currentTexture2D.IsNormalMap.Value = true;
                         Utils.SSBumpToNormal(currentTexture2D);
                     }
 
@@ -163,20 +162,16 @@ public abstract class PBSSpecularParser
                     {
                         await currentTexture2D.InvertG();
                     }
-
-                    currentTexture2D.IsNormalMap.Value = true;
-                    currentMaterial.NormalMap.Target = currentTexture2D;
                     break;
                 case "$heightmap":
                     currentMaterial.HeightMap.Target = currentTexture2D;
                     break;
             }
-            await default(ToBackground);
         }
 
         // Convert key value list to dictionary for easier access
         var propertiesDictionary = properties.Distinct().ToDictionary((keyItem) => keyItem.Key, (valueItem) => valueItem.Value);
-
+        // A bunch of material and texture operations, there is properly a better way to do this ...
         currentMaterial = await SetAlphaClip(currentMaterial, propertiesDictionary);
         currentMaterial = await SetAlphaBlend(currentMaterial, propertiesDictionary);
         currentMaterial = await CreateSpecularFromSpecularMap(currentMaterial, propertiesDictionary, currentSlot);
@@ -282,6 +277,11 @@ public abstract class PBSSpecularParser
 
     private async Task<PBS_Specular> CreateSpecularFromNormalMap(PBS_Specular currentMaterial, Dictionary<string, string> propertiesDictionary, Slot currentSlot, Bitmap2D normalmapBitmap)
     {
+        if (normalmapBitmap == null)
+        {
+            return currentMaterial;
+        }
+
         // Handle specular texture in normal map
         if (propertiesDictionary.TryGetValue("$normalmapalphaenvmapmask", out string hasNormalmapSpecular) &&
             propertiesDictionary.TryGetValue("$basetexture", out string specularAlbedoForNormalmap))

@@ -21,7 +21,7 @@ namespace Sledge2Resonite
     {
         public override string Name => "Sledge2Resonite";
         public override string Author => "Elektrospy";
-        public override string Version => "0.3.0";
+        public override string Version => "0.3.1";
         public override string Link => "https://github.com/Elektrospy/Sledge2Resonite";
 
         internal static ModConfiguration config;
@@ -29,7 +29,7 @@ namespace Sledge2Resonite
         public override void DefineConfiguration(ModConfigurationDefinitionBuilder builder)
         {
             builder
-                .Version(new Version(0, 3, 0))
+                .Version(new Version(0, 3, 1))
                 .AutoSave(true);
         }
 
@@ -368,7 +368,6 @@ namespace Sledge2Resonite
 
             Debug($"Processing VTF with {currentVtf.Images.Count} total images (including mipmaps)");
 
-
             Bitmap2D newBitmap;
             if (shouldGenerateAtlas && framesNumber > 1)
             {
@@ -390,14 +389,31 @@ namespace Sledge2Resonite
             // Configure texture filtering
             ConfigureTextureFiltering(currentTexture2D, currentVtf);
 
+            // Setup final components
+            ImageImporter.SetupTextureProxyComponents(currentSlot, currentTexture2D, StereoLayout.None, ImageProjection.Perspective, false);
+            ImageImporter.CreateQuad(currentSlot, currentTexture2D, StereoLayout.None, true);
+            currentSlot.AttachComponent<Grabbable>().Scalable.Value = true;
+
             // Handle normal maps
-            await ProcessNormalMaps(currentTexture2D, currentVtf, lowerVtfName, shouldInvertNormalG);
+            if (currentVtf.Header.Flags.HasFlag(VtfImageFlag.Normal)
+                && (lowerVtfName.Contains("_normal") || lowerVtfName.Contains("_bump")))
+            {
+                currentTexture2D.IsNormalMap.Value = true;
+
+                if (shouldInvertNormalG)
+                {
+                    await currentTexture2D.InvertG();
+                }
+            }
 
             // Handle SSBump conversion
-            ProcessSSBump(currentTexture2D, currentVtf, lowerVtfName, shouldAutoConvertSSBump);
-
-            // Setup final components
-            SetupFinalComponents(currentSlot, currentTexture2D);
+            if (shouldAutoConvertSSBump
+                && currentVtf.Header.Flags.HasFlag(VtfImageFlag.SsBump)
+                && (lowerVtfName.Contains("_ssbump") || lowerVtfName.Contains("_bump")))
+            {
+                currentTexture2D.IsNormalMap.Value = true;
+                Utils.SSBumpToNormal(currentTexture2D);
+            }
         }
 
         static Bitmap2D CreateSingleTextureWithMipmaps(VtfFile vtfFile)
@@ -454,7 +470,7 @@ namespace Sledge2Resonite
             byte[] atlasData = new byte[atlasSize];
 
             // Copy each frame's highest quality image to the atlas
-            await CopyFramesToAtlas(vtfFile, frameCount, mipmapLevels, baseWidth, baseHeight, atlasData);
+            await CopyFramesToAtlas(vtfFile, frameCount, baseWidth, baseHeight, atlasData);
 
             // Create the final atlas bitmap using the highest quality images
             return new Bitmap2D(
@@ -469,8 +485,7 @@ namespace Sledge2Resonite
             );
         }
 
-        static async Task CopyFramesToAtlas(VtfFile vtfFile, int frameCount, int mipmapLevels,
-            int frameWidth, int frameHeight, byte[] atlasData)
+        static Task CopyFramesToAtlas(VtfFile vtfFile, int frameCount, int frameWidth, int frameHeight, byte[] atlasData)
         {
             unsafe
             {
@@ -514,6 +529,8 @@ namespace Sledge2Resonite
                     }
                 }
             }
+
+            return Task.CompletedTask;
         }
 
         static void ConfigureTextureFiltering(StaticTexture2D texture2D, VtfFile vtfFile)
@@ -531,53 +548,6 @@ namespace Sledge2Resonite
                 texture2D.FilterMode.Value = TextureFilterMode.Anisotropic;
                 texture2D.AnisotropicLevel.Value = 8;
             }
-        }
-
-        static async Task ProcessNormalMaps(StaticTexture2D texture2D, VtfFile vtfFile,
-            string lowerVtfName, bool shouldInvertNormalG)
-        {
-            if (vtfFile.Header.Flags.HasFlag(VtfImageFlag.Normal)
-                && (lowerVtfName.Contains("_normal") || lowerVtfName.Contains("_bump")))
-            {
-                texture2D.IsNormalMap.Value = true;
-
-                if (shouldInvertNormalG)
-                {
-                    await texture2D.ProcessPixels((color c) => new color(c.r, 1f - c.g, c.b, c.a));
-                }
-            }
-        }
-
-        static void ProcessSSBump(StaticTexture2D texture2D, VtfFile vtfFile,
-            string lowerVtfName, bool shouldAutoConvertSSBump)
-        {
-            if (shouldAutoConvertSSBump
-                && vtfFile.Header.Flags.HasFlag(VtfImageFlag.SsBump)
-                && (lowerVtfName.Contains("_ssbump") || lowerVtfName.Contains("_bump")))
-            {
-                texture2D.IsNormalMap.Value = true;
-                Utils.SSBumpToNormal(texture2D);
-            }
-        }
-
-        static void SetupFinalComponents(Slot slot, StaticTexture2D texture2D)
-        {
-            ImageImporter.SetupTextureProxyComponents(
-                slot,
-                texture2D,
-                StereoLayout.None,
-                ImageProjection.Perspective,
-                false
-            );
-
-            ImageImporter.CreateQuad(
-                slot,
-                texture2D,
-                StereoLayout.None,
-                true
-            );
-
-            slot.AttachComponent<Grabbable>().Scalable.Value = true;
         }
 
         static async Task NewLUTImport(string path, Slot targetSlot)
@@ -641,11 +611,11 @@ namespace Sledge2Resonite
             lutTex.AnisotropicLevel.Value = 16;
             lutTex.DirectLoad.Value = true;
             lutTex.PreferredFormat.Value = TextureCompression.RawRGBA;
-            lutTex.PreferredProfile.Value = Sledge2Resonite.config.GetValue(Sledge2Resonite.invertNormalmapG) ? ColorProfile.Linear : ColorProfile.sRGB;
+            lutTex.PreferredProfile.Value = Sledge2Resonite.config.GetValue(Sledge2Resonite.lutAsLinear) ? ColorProfile.Linear : ColorProfile.sRGB;
 
             var lutMat = targetSlot.AttachComponent<LUT_Material>();
             lutMat.LUT.Target = lutTex;
-            lutMat.UseSRGB.Value = !Sledge2Resonite.config.GetValue(Sledge2Resonite.invertNormalmapG);
+            lutMat.UseSRGB.Value = !Sledge2Resonite.config.GetValue(Sledge2Resonite.lutAsLinear) ? false : true;
 
             MaterialOrb.ConstructMaterialOrb(lutMat, targetSlot);
         }
