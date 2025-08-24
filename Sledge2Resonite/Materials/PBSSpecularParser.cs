@@ -44,6 +44,7 @@ namespace Sledge2Resonite;
 /// "$normalalphaenvmapmask" "1" -> common typo of the same setting
 /// "$envmapmaskintintmasktexture" "1" -> Use the red channel of the $tintmasktexture as the specular mask.
 /// "$specmap_texture" "some/path/texturename" -> Specular texture, used with special shader for Black Mesa (Blue Shift)
+/// "$specmap_mode" "1" -> Defines style and behaviour for speculars. 0: ignore $specmap_texture, 1: use as glossiness map, 2: use as tint map
 /// --- Emission ---
 /// "$selfillum" "1" -> Material is emissive, use albedo texture with blacked out background if "$selfillummask" is not set
 /// "$selfillum_envmapmask_alpha" "1" -> replaces the original "$selfillum" command
@@ -114,7 +115,7 @@ public abstract class PBSSpecularParser
 
             // VTF contains mip-maps, but we only care about the last original image
             VtfImage currentVtfImage = currentVtf.Images.Last();
-            var newBitmap = new Bitmap2D(currentVtfImage.GetBgra32Data(), currentVtfImage.Width, currentVtfImage.Height, TextureFormat.BGRA32, false, ColorProfile.Linear, false);
+            var newBitmap = new Bitmap2D(currentVtfImage.GetBgra32Data(), currentVtfImage.Width, currentVtfImage.Height, TextureFormat.BGRA32, true, ColorProfile.sRGB, false);
             await default(ToWorld);
             StaticTexture2D currentTexture2D = currentSlot.AttachComponent<StaticTexture2D>();
             currentTexture2D.URL.Value = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(newBitmap);
@@ -207,8 +208,8 @@ public abstract class PBSSpecularParser
                         albMap.Width,
                         albMap.Height,
                         TextureFormat.BGRA32,
-                        false,
-                        ColorProfile.Linear,
+                        true,
+                        ColorProfile.sRGB,
                         false);
 
                     // Wait for the world to catch up
@@ -228,7 +229,7 @@ public abstract class PBSSpecularParser
         string currentEnvmapmask;
         if ((propertiesDictionary.TryGetValue("$envmapmask", out currentEnvmapmask) ||
             propertiesDictionary.TryGetValue("$specmap_texture", out currentEnvmapmask)) &&
-                    propertiesDictionary.TryGetValue("$basetexture", out string specularAlbedo))
+            propertiesDictionary.TryGetValue("$basetexture", out string specularAlbedo))
         {
             if (specularAlbedo == null || currentEnvmapmask == null)
             {
@@ -260,8 +261,8 @@ public abstract class PBSSpecularParser
 
                 // Create new specular bitmap from merging into albedo
                 var finalMap = CreateSpecularByAlphaTransfer(
-                    new Bitmap2D(albMapModified, albMap.Width, albMap.Height, TextureFormat.BGRA32, false, ColorProfile.Linear, false),
-                    new Bitmap2D(envMapModified, envMap.Width, envMap.Height, TextureFormat.BGRA32, false, ColorProfile.Linear, false));
+                    new Bitmap2D(albMapModified, albMap.Width, albMap.Height, TextureFormat.BGRA32, true, ColorProfile.sRGB, false),
+                    new Bitmap2D(envMapModified, envMap.Width, envMap.Height, TextureFormat.BGRA32, true, ColorProfile.sRGB, false));
 
                 // Create new specular texture asset and assign
                 await default(ToWorld);
@@ -299,7 +300,7 @@ public abstract class PBSSpecularParser
                     var albMapRaw = albMap.GetBgra32Data();
 
                     // Create new specular bitmap from copying the normalmap alpha into the albedo alpha
-                    var finalMap = CreateSpecularByAlphaTransfer(new Bitmap2D(albMapRaw, albMap.Width, albMap.Height, TextureFormat.BGRA32, false, ColorProfile.Linear, false), normalmapBitmap);
+                    var finalMap = CreateSpecularByAlphaTransfer(new Bitmap2D(albMapRaw, albMap.Width, albMap.Height, TextureFormat.BGRA32, true, ColorProfile.sRGB, false), normalmapBitmap);
 
                     // Wait for the world to catch up
                     await default(ToWorld);
@@ -372,15 +373,15 @@ public abstract class PBSSpecularParser
                 // Add new emission texture to world and tint background black
                 var albMap = tempAlbedoBitmap2D.Images.Last();
                 var albMapRaw = albMap.GetBgra32Data();
-                var newEmission = new Bitmap2D(albMapRaw, albMap.Width, albMap.Height, TextureFormat.BGRA32, false, ColorProfile.Linear, false);
+                var newEmission = new Bitmap2D(albMapRaw, albMap.Width, albMap.Height, TextureFormat.BGRA32, true, ColorProfile.sRGB, false);
 
                 // Assign to material
                 await default(ToWorld);
                 StaticTexture2D emissionTexture = currentSlot.AttachComponent<StaticTexture2D>();
                 emissionTexture.URL.Value = await currentSlot.World.Engine.LocalDB.SaveAssetAsync(newEmission);
-                await emissionTexture.ProcessPixels(c => color.AlphaBlend(c, color.Black));
                 currentMaterial.EmissiveMap.Target = emissionTexture;
                 await default(ToBackground);
+                await emissionTexture.ProcessPixels(c => color.AlphaBlend(c, color.Black));
 
                 // set emission color
                 await SetEmissionColor(currentMaterial, propertiesDictionary);
@@ -484,7 +485,7 @@ public abstract class PBSSpecularParser
             var specMapRaw = specMap.GetBgra32Data();
 
             // Create new specular bitmap from copying the normalmap alpha into the albedo alpha
-            var finalMap = new Bitmap2D(specMapRaw, specMap.Width, specMap.Height, TextureFormat.BGRA32, false, ColorProfile.Linear, false);
+            var finalMap = new Bitmap2D(specMapRaw, specMap.Width, specMap.Height, TextureFormat.BGRA32, true, ColorProfile.sRGB, false);
 
             // Wait for the world to catch up
             await default(ToWorld);
